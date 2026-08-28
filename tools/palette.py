@@ -36,6 +36,23 @@ INK = (0x00, 0x00, 0x00)     # shade 4 -- outline and hair
 
 RAMP = [PAPER, SKIN, OUTFIT, INK]
 
+# The trainer art -- the battle back pic, and the front pic Oak's intro, the
+# trainer card and the Hall of Fame share -- takes a different four, because
+# shade 2 does not mean the same thing there.
+#
+# On the 16x16 overworld sprite shade 2 is only ever the face.  On the 56x56
+# portrait it is the LIGHT for everything: the cap's front, the shading on
+# the shirt, the highlight on the knees and the shoes.  Vanilla gets away
+# with one shade for both because its ramp is monochrome red -- white, light
+# red, red, black -- and light red happens to look like skin.  Painting that
+# shade a skin tone put orange blotches on the hat and the knees.
+#
+# So the portrait gets the same trick in green: white, light green, green,
+# black.  The face reads as a pale green rather than as skin, which is
+# exactly the compromise vanilla makes in the other direction.
+PIC_LIGHT = (0xa8, 0xdd, 0x8a)
+PIC_RAMP = [PAPER, PIC_LIGHT, OUTFIT, INK]
+
 # Not shades.  Two parts of the sprite are drawn in a shade that is not their
 # own, and are told apart by where they sit rather than by colour.
 #

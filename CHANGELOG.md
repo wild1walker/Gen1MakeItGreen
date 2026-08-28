@@ -2,7 +2,41 @@
 
 All notable changes to this mod are recorded here, newest first.
 
-## [1.2.0] - unreleased
+## [1.3.0] - unreleased
+
+### Changed
+
+- **The trainer art takes its own ramp: white, light green, green, black.**
+  1.2.0 reached those pictures for the first time and they came out blotchy —
+  orange patches on the cap and knees, red speckles over the rest — and that
+  was not a tuning problem. Shade 2 does not mean the same thing on the two
+  kinds of art. On the 16×16 overworld sprite it is only ever the face; on
+  the 56×56 portrait it is the *light* for everything: the cap's front, the
+  shirt's shading, the knees, the shoes.
+
+  Vanilla gets away with one shade for both because its ramp is monochrome
+  red — white, light red, red, black — and light red happens to look like
+  skin. Painting that shade a skin tone is what put the orange on the hat.
+
+  So the portrait gets the same trick in green, and neither position rule:
+  a face-sized rule on face-sized art is noise. The face reads as a pale
+  green rather than as skin, which is the same compromise vanilla makes in
+  the other direction. The overworld sheets are untouched — they keep the
+  skin tone, the red lips and the green-tinted bill.
+
+### Fixed
+
+- **The recipe and the hook share one list of pictures.** The hook swapped
+  any cache path it was handed, and a swap to a green file the recipe never
+  wrote does not fall back to the red one — the image fails to load and the
+  draw shows nothing. Both now name the same eight, in the same order, and
+  `tools/check.py` fails the build if they drift apart.
+- **Five more pictures are covered**: `battle/back/redb.png`,
+  `credits/red.png`, `intro/red.png` and `hall_of_fame/red.png` join the
+  four that were already there. Each is probed with `ctx.exists`, so a cache
+  without one simply keeps that picture as the base game drew it.
+
+## [1.2.0] - 2026-08-28
 
 ### Fixed
 

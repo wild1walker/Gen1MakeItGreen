@@ -62,38 +62,61 @@ return function(ctx)
   -- gives it back its own edge against both.
   local BILL = { 0xe6, 0xf4, 0xdc }
 
-  -- Every picture of the player, by its cache-relative path.
+  -- The trainer art takes a DIFFERENT four, because shade 2 does not mean
+  -- the same thing there.
+  --
+  -- On the 16x16 overworld sprite shade 2 is only ever the face.  On the
+  -- 56x56 portrait it is the LIGHT for everything: the cap's front, the
+  -- shading on the shirt, the highlight on the knees and the shoes.  Vanilla
+  -- gets away with one shade for both because its ramp is monochrome red --
+  -- white, light red, red, black -- and light red happens to look like skin.
+  -- Painting that shade a skin tone put orange blotches on the hat and the
+  -- knees, and the mouth rule speckled red over the rest.
+  --
+  -- So the portrait gets the same trick in green, and neither of the
+  -- position rules: a face-sized rule on face-sized art is noise.
+  local WILD_GREEN_PIC = {
+    { 0xff, 0xff, 0xff },
+    { 0xa8, 0xdd, 0x8a },
+    { 0x65, 0xba, 0x3f },
+    { 0x00, 0x00, 0x00 },
+  }
+
+  -- Every picture of the player this recipe knows how to recolour, and the
+  -- ONLY ones main.lua will swap: the hook checks this same list, so it can
+  -- never point a draw at a green file the recipe did not write.  The two
+  -- copies are compared by tools/check.py.
   --
   --   sprites/red.png        the overworld walker (SPRITE_RED, 16x96)
-  --   sprites/red_bike.png   the same on the BICYCLE, where the import made one
+  --   sprites/red_bike.png   the same on the BICYCLE
   --   battle/redb.png        the battle back pic, drawn at 2x until "Go!"
-  --   trainer_card/red.png   the front pic: Oak's intro, the card, Hall of Fame
+  --   trainer_card/red.png   the front pic Oak's intro, the card and the
+  --                          Hall of Fame share
   --
-  -- The title screen's standing figure is NOT in this list, and cannot be.
-  -- TitleState bakes the OBJ palette onto it (Sprites.recolor with
-  -- PaletteFX.ogObj) and has no trueColor path for it -- markVisibleTrueColor
-  -- explicitly cuts the player's rectangle OUT of the true-colour region, so
-  -- the mon behind him keeps its palette.  A recoloured pic handed to that
-  -- draw is read back through the shade buckets: the tan skin comes out white
-  -- and the green outfit comes out whatever colour index 3 happens to be,
-  -- which in the field was pink.  So the title keeps the figure the base game
-  -- drew, and the ribbon carries the branding on its own.
+  -- The rest are names an import may or may not have written; ctx.exists
+  -- decides, and a cache without one simply keeps that picture as the base
+  -- game drew it.
   --
-  -- The names are the importer's, not this mod's, and a cache that spells one
-  -- differently is a cache this mod cannot recolour -- so every candidate is
-  -- probed rather than assumed.
-  -- The hook in main.lua derives its green path from whatever the engine
-  -- hands it, so anything written here is picked up without being named
-  -- twice.
+  -- Two absences are deliberate.  The old man's demo back pic
+  -- (battle/oldmanb.png) is not the player, and the catch tutorial should
+  -- not turn green.  And the title screen's standing figure has no seam:
+  -- TitleState bakes the OBJ palette onto it and cuts its rectangle out of
+  -- the true-colour region so the mon behind it keeps its palette, so
+  -- recoloured art handed to that draw comes back through the shade buckets
+  -- -- white and pink, in the field.  main.lua colours it through MEWMON
+  -- instead.
   --
-  -- The old man's demo back pic (battle/oldmanb.png) is deliberately absent:
-  -- he is not the player, and the catch tutorial should not turn green.
+  -- `field` picks the ramp: true takes the overworld four and the mouth and
+  -- bill rules, false takes the portrait four and neither.
   local PICS = {
-    "sprites/red.png",
-    "sprites/red_bike.png",
-    "battle/redb.png",
-    "battle/back/redb.png",
-    "trainer_card/red.png",
+    { "sprites/red.png", true },
+    { "sprites/red_bike.png", true },
+    { "battle/redb.png", false },
+    { "battle/back/redb.png", false },
+    { "trainer_card/red.png", false },
+    { "credits/red.png", false },
+    { "intro/red.png", false },
+    { "hall_of_fame/red.png", false },
   }
 
   -- ------- the mouth is not clothing
@@ -147,7 +170,9 @@ return function(ctx)
 
   local STEPS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 
-  local function recoloured(rel, bill)
+  local function recoloured(rel, field)
+    local ramp = field and WILD_GREEN or WILD_GREEN_PIC
+    local bill = field
     local src = ctx.readImage(rel)
     local out = ctx.readImage(rel)
     local w, h = src:getDimensions()
@@ -222,8 +247,10 @@ return function(ctx)
     out:mapPixel(function(x, y, r, g, b, a)
       if a == 0 then return r, g, b, a end
       local s = shade[y][x]
-      local colour = WILD_GREEN[s]
-      if s == 3 and beside(x, y, -1) == 2 and beside(x, y, 1) == 2 then
+      local colour = ramp[s]
+      if not field then
+        -- the portrait: the ramp and nothing else
+      elseif s == 3 and beside(x, y, -1) == 2 and beside(x, y, 1) == 2 then
         -- a mouth: the outfit's shade, but enclosed by face
         colour = MOUTH
       elseif s == 2 and isBill[y] and isBill[y][x] then
@@ -234,24 +261,18 @@ return function(ctx)
     return out
   end
 
-  for _, rel in ipairs(PICS) do
+  for _, entry in ipairs(PICS) do
+    local rel, field = entry[1], entry[2]
     -- A cache that does not carry one of these is a cache from a version or
     -- an import that never made it, not a broken install: skip it and leave
     -- that picture as the base game drew it.
     if ctx.exists(rel) then
-      -- The bill rule is for the overworld sheets only.  There the cap is a
-      -- handful of pixels and "skin directly under the cap" means one thing;
-      -- on the 56x56 trainer card there are dozens of shade-2-under-shade-3
-      -- adjacencies that are shading, not a bill, and every one of them would
-      -- turn green.
-      -- ...and only when the sheet really is a stack of 16px frames, since
-      -- y % 16 means nothing otherwise.
-      -- ...and only when the sheet really is a stack of 16px frames, since
-      -- a frame-local row means nothing otherwise.
-      local bill = rel:match("^sprites/") ~= nil
-      local ok, image = pcall(recoloured, rel, bill)
+      local ok, image = pcall(recoloured, rel, field)
       if not ok then
-        image = ctx.recolor(ctx.readImage(rel), WILD_GREEN)
+        -- the per-pixel path is one step past the documented ctx, so its
+        -- absence costs the position rules and nothing else
+        image = ctx.recolor(ctx.readImage(rel),
+          field and WILD_GREEN or WILD_GREEN_PIC)
       end
       ctx.writeImage(image, "green/" .. rel)
     end

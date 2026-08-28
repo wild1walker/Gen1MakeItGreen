@@ -96,16 +96,29 @@ return function(mod)
 
   local green = option("player", "green") == "green"
 
-  -- The green twin of a cache path, or nil when the path is not one.
-  --
-  -- No whitelist of filenames.  transforms.lua recolours what the cache
-  -- actually has, and this turns whatever path the engine resolved into the
-  -- matching derived one, so the two halves cannot disagree about a name.
+  -- Exactly the pictures transforms.lua recolours, and the only ones this
+  -- will swap.  It is the same list, in the same order, and tools/check.py
+  -- compares the two -- because a swap to a green file the recipe did not
+  -- write does not fall back to the red one, it draws nothing at all.
+  local RECOLOURED = {
+    "sprites/red.png",
+    "sprites/red_bike.png",
+    "battle/redb.png",
+    "battle/back/redb.png",
+    "trainer_card/red.png",
+    "credits/red.png",
+    "intro/red.png",
+    "hall_of_fame/red.png",
+  }
+
+  local KNOWN = {}
+  for _, rel in ipairs(RECOLOURED) do KNOWN[rel] = true end
+
+  -- The green twin of a cache path, or nil when there is not one.
   local function greenOf(path)
     if type(path) ~= "string" then return nil end
     local rel = path:match("^" .. CACHE .. "(.+)$")
-    -- Already ours, or already somebody else's: leave it where it points.
-    if not rel or rel:match("^green/") then return nil end
+    if not rel or not KNOWN[rel] then return nil end
     return GREEN .. rel
   end
 

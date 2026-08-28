@@ -174,16 +174,48 @@ do
   eq(px and hex(px[8][3]), "000000", "an eye stays black")
 end
 
-io.write("transforms.lua -- the bill rule is overworld-only\n")
+io.write("transforms.lua -- the trainer art takes the other ramp\n")
 do
-  -- On the 56x56 card there are dozens of shade-2-under-shade-3 adjacencies
-  -- that are shading rather than a bill, so the rule does not run there.
+  -- Shade 2 on the 56x56 portrait is the LIGHT for everything -- the cap's
+  -- front, the shirt's shading, the knees -- not the face.  A skin tone
+  -- there put orange blotches on the hat, and the face-sized position rules
+  -- are noise at that size.  So the portrait gets a monochrome green ramp
+  -- and neither rule, the way vanilla's own ramp is monochrome red.
   local ctx = fakeCtx({ ["trainer_card/red.png"] = FACE })
   chunk(MOD .. "transforms.lua")(ctx)
   local px = ctx.written["green/trainer_card/red.png"].out
-  eq(hex(px[2][3]), "f0a363",
-    "shade 2 touching the cap stays skin on the trainer card")
-  eq(hex(px[9][4]), "ec4d29", "...and the mouth rule still applies there")
+  eq(hex(px[7][3]), "a8dd8a",
+    "shade 2 is the light green, not skin")
+  eq(hex(px[1][3]), "65ba3f", "shade 3 is still the outfit green")
+  eq(hex(px[9][4]), "65ba3f",
+    "no mouth rule on the portrait: shade 3 stays the outfit")
+  eq(hex(px[2][3]), "a8dd8a",
+    "no bill rule either: shade 2 touching the cap stays the light")
+  eq(hex(px[8][3]), "000000", "ink is still ink")
+end
+
+io.write("transforms.lua -- every picture is covered\n")
+do
+  -- The hook only swaps what the recipe writes, so a picture named in one
+  -- and not the other draws nothing at all.  Both lists are checked against
+  -- each other by tools/check.py; this checks the recipe reaches them.
+  local all = {}
+  for _, rel in ipairs({ "sprites/red.png", "sprites/red_bike.png",
+                         "battle/redb.png", "battle/back/redb.png",
+                         "trainer_card/red.png", "credits/red.png",
+                         "intro/red.png", "hall_of_fame/red.png" }) do
+    all[rel] = FACE
+  end
+  local ctx = fakeCtx(all)
+  chunk(MOD .. "transforms.lua")(ctx)
+  for rel in pairs(all) do
+    ok(ctx.written["green/" .. rel] ~= nil, "green/" .. rel .. " written")
+  end
+  -- and the two ramps land on the right side of the line
+  eq(hex(ctx.written["green/sprites/red.png"].out[7][3]), "f0a363",
+    "the overworld sheet keeps skin")
+  eq(hex(ctx.written["green/battle/redb.png"].out[7][3]), "a8dd8a",
+    "the battle back pic takes the light green")
 end
 
 io.write("transforms.lua\n")
@@ -195,7 +227,7 @@ do
     wrote[rel] = true
     count = count + 1
   end
-  eq(count, 4, "four pictures written")
+  eq(count, 4, "only what this cache carries is written")
   for _, rel in ipairs({ "sprites/red.png", "sprites/red_bike.png",
                          "battle/redb.png", "trainer_card/red.png" }) do
     ok(wrote["green/" .. rel], "green/" .. rel .. " written")

@@ -19,6 +19,7 @@ It works on its own too. Nothing here depends on either bundle.
 | the overworld walker | `SPRITE_RED`, and the `BICYCLE` sheet where the import wrote one | the `sprites` registry |
 | the battle back pic | the one drawn at 2x until "Go!" | the `player.sprite` hook |
 | the front pic | Oak's intro, the trainer card, the Hall of Fame | the `player.sprite` hook |
+| the credits and intro pics | where the import wrote them | the `player.sprite` hook |
 | the title screen | the version ribbon | `field.boot.title` |
 | the title figure | the standing player on that screen | the `MEWMON` palette |
 | the default name | `GREEN` where the game offered `RED` | `field.boot.playerName` |
@@ -74,6 +75,11 @@ own imported cache. [`transforms.lua`](transforms.lua) is that recipe: it
 runs once on install, and again only when the cache is re-imported or the
 recipe changes.
 
+The recipe and the hook name the **same eight pictures**, in the same order,
+and `tools/check.py` fails the build if they drift apart. That is not
+tidiness: a swap to a green file the recipe never wrote does not fall back to
+the red one — the image fails to load and the draw shows nothing at all.
+
 Its outputs go under a `green/` prefix rather than over the cache paths they
 were read from. Writing `sprites/red.png` would make the player green
 everywhere, always, and would take the `PLAYER` row away — there would be no
@@ -86,7 +92,7 @@ Four colours, in [`tools/palette.py`](tools/palette.py), and the same
 four everywhere they appear — the sprite recolor, the ribbon lettering, the
 cart's shell and the cart's label:
 
-**The character**, in shade order:
+**The overworld character**, in shade order:
 
 | | | |
 |---|---|---|
@@ -101,6 +107,26 @@ and two colours that are not shades at all:
 |---|---|---|
 | mouth | `#ec4d29` | the lips — vanilla's own, sampled off red Red |
 | bill | `#e6f4dc` | the cap's bill — a green-tinted white |
+
+**The trainer art** — the battle back pic, and the front pic Oak's intro,
+the trainer card and the Hall of Fame share — takes a different four, because
+shade 2 does not mean the same thing there:
+
+| | | |
+|---|---|---|
+| paper | `#ffffff` | |
+| light | `#a8dd8a` | the light for **everything**: the cap's front, the shirt's shading, the knees |
+| outfit | `#65ba3f` | |
+| ink | `#000000` | |
+
+On the 16×16 sprite shade 2 is only ever the face. On the 56×56 portrait it
+is the light on every surface. Vanilla gets away with one shade for both
+because its ramp is monochrome red — white, light red, red, black — and light
+red happens to look like skin; painting that shade a skin tone put orange
+blotches on the hat and the knees. The portrait gets the same trick in green,
+and neither position rule, because a face-sized rule on face-sized art is
+noise. The face reads as a pale green rather than as skin, which is the same
+compromise vanilla makes in the other direction.
 
 That second row is the one this mod got wrong twice. Shade 2 is not clothing;
 it is the skin. 1.0.0 recoloured shades 2 and 3 both, which turned the face

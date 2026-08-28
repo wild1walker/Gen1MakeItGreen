@@ -36,11 +36,12 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from palette import EXTRA, RAMP, TITLE_RAMP, hexof  # noqa: E402
+from palette import EXTRA, PIC_RAMP, RAMP, TITLE_RAMP, hexof  # noqa: E402
 
 # (file, the table in it, what tools/palette.py says it must be)
 RAMPS = (
-    ("transforms.lua", "local WILD_GREEN", RAMP),
+    ("transforms.lua", "local WILD_GREEN =", RAMP),
+    ("transforms.lua", "local WILD_GREEN_PIC", PIC_RAMP),
     ("main.lua", "local WILD_GREEN =", RAMP),
     ("main.lua", "local WILD_GREEN_TITLE", TITLE_RAMP),
 )
@@ -99,6 +100,27 @@ def check_extras():
                  % (name, got and hexof(got), hexof(want)))
 
 
+def check_pics():
+    """The recipe's list and the hook's list are the same list.
+
+    They have to be.  A swap to a green file the recipe did not write does
+    not fall back to the red one -- the image fails to load and the draw
+    shows nothing at all -- so the hook must only ever name a picture the
+    recipe covers.
+    """
+    recipe = re.findall(r'\{\s*"([^"]+)"\s*,\s*(?:true|false)\s*\}',
+                        (ROOT / "transforms.lua").read_text(encoding="utf-8"))
+    text = (ROOT / "main.lua").read_text(encoding="utf-8")
+    block = re.search(r"local RECOLOURED = \{(.*?)\n  \}", text, re.S)
+    if block is None:
+        fail("main.lua", "no RECOLOURED list to compare")
+        return
+    hook = re.findall(r'"([^"]+\.png)"', block.group(1))
+    if recipe != hook:
+        fail("PICS", "the recipe recolours %s but the hook swaps %s"
+             % (recipe, hook))
+
+
 def check_generated():
     """A rebuild has to produce the bytes that are committed."""
     if not RIBBON.is_file():
@@ -119,6 +141,7 @@ def check_generated():
 def main():
     check_palettes()
     check_extras()
+    check_pics()
     check_generated()
     for finding in findings:
         print("check: %s" % finding)
