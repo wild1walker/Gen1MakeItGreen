@@ -2,6 +2,51 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.22.0] - 2026-08-28
+
+### Fixed
+
+- **The battle back pic had no skin on it at all.** In a battle he was one
+  green shape from the cap to the boots — the complaint that the battle
+  sprites were "still just all green" was looking at this picture.
+
+  No rule ever reached it. `skinMask` is built around finding a FACE and
+  returns nothing the moment it cannot, and every rule it has after that —
+  the ear, the hands, the glint, the temple — is placed relative to the
+  face's own bounds. On the back of his head there is no face, so the
+  picture fell through to the plain `WILD_GREEN_PIC` ramp and stayed there.
+  The `greenskin/` copy came out identical to the `green/` one, which is why
+  `PORTRAIT SKIN` appeared to do nothing on it.
+
+  What is actually skin on it is two pieces: the **neck and jaw** below the
+  cap, and the **hand and forearm** at his lower right.
+
+  It is painted from a table rather than by a new rule, on the same terms as
+  the title figure. Of its 33 skin pixels **eleven come from the paper
+  shade** — the back of the hand is drawn in white — and no rule in this file
+  touches white; a white patch is not distinguishable from the ground by
+  shade at all. And it is one fixed 32×32 picture, not a sheet of frames a
+  rule has to generalise over. Inventing a rule to fit a single sprite is,
+  as the title figure already puts it, a drawing with extra steps.
+
+  The shade is the guard, as it is there: every entry names the shade it was
+  authored against, so a cache holding a different back pic fails the checks
+  and the picture comes out exactly as it did before rather than skin-toned
+  in the wrong places. It carries no pixels of the vanilla art — 33
+  coordinates out of 489 drawn ones, and what they carry is where his neck
+  and his hand are.
+
+- `PORTRAIT SKIN` is a real switch on the back pic now. It could not be
+  before: with nothing painted, the two copies the recipe writes were the
+  same picture.
+
+### Changed
+
+- `titleMask` is now `tableMask`, taking the table to apply, and `TITLE_MIN`
+  and `TITLE_TONE` are `TABLE_MIN` and `TABLE_TONE` — two pictures carry
+  tables now and the guard is the same for both. No behaviour change to the
+  title figure.
+
 ## [1.21.0] - 2026-08-28
 
 ### Fixed

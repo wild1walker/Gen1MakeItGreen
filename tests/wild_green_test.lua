@@ -348,10 +348,15 @@ do
   eq(hex(skin.out[7][1]), "ffffff", "the ground is still paper")
 end
 
-io.write("transforms.lua -- no face, no skin anywhere\n")
+io.write("transforms.lua -- a back pic the table was not drawn against\n")
 do
-  -- The battle BACK pic: no face on the back of his head, so nothing is
-  -- painted at all -- not even something shaped like a hand.
+  -- The battle BACK pic carries a table, and this is not the picture it was
+  -- drawn against: nine rows tall, so every entry in it is out of bounds and
+  -- none can find the shade it wants.  The guard rejects the whole table,
+  -- the picture falls through to the ordinary rules, and those find no face
+  -- on the back of his head -- so nothing is painted at all, not even
+  -- something shaped like a hand.  A cache holding a different rip comes out
+  -- as the plain ramp drew it rather than skin-toned in the wrong places.
   local NO_FACE = {
     { W, W, K, K, K, K, K, K, W, W, W, W, W, W },
     { W, K, O, S, S, S, S, O, K, W, W, W, W, W },
@@ -370,6 +375,59 @@ do
   eq(hex(skin.out[2][5]), "a8dd8a", "the sealed shading is not a face")
   eq(hex(skin.out[7][3]), "65ba3f",
     "and with no face found, a hand-shaped patch is left alone too")
+end
+
+io.write("transforms.lua -- the battle back pic is painted from a table\n")
+do
+  -- The back pic had no skin on it anywhere: he was one green shape from the
+  -- cap to the boots.  No rule ever reached it -- skinMask is built around
+  -- finding a FACE and gives up the moment it cannot, and the ear, the
+  -- hands, the glint and the temple are all placed relative to the face's
+  -- own bounds.  So it carries a table, for the same reason the title figure
+  -- does: eleven of its 33 skin pixels come from the PAPER shade -- the back
+  -- of the hand is drawn in white -- and no rule in this file touches white.
+  --
+  -- This fixture is not the vanilla art.  It is the table's OWN guard shades
+  -- at the table's own coordinates, over a flat field of the outfit's shade:
+  -- everything the table looks for is there, so all 33 entries match and it
+  -- paints, and nothing else about the picture is his.
+  local LIGHT = { { 10, 18 }, { 11, 16 }, { 12, 16 }, { 13, 17 },
+                  { 14, 14 }, { 14, 15 }, { 14, 16 }, { 14, 17 }, { 14, 18 } }
+  local PAPER = { { 20, 23 }, { 20, 24 }, { 20, 25 }, { 21, 23 }, { 21, 24 },
+                  { 21, 25 }, { 22, 24 }, { 22, 25 }, { 22, 26 }, { 23, 25 },
+                  { 23, 26 } }
+  local BACK = {}
+  for y = 1, 32 do
+    BACK[y] = {}
+    for x = 1, 32 do BACK[y][x] = O end
+  end
+  for _, at in ipairs(LIGHT) do BACK[at[1] + 1][at[2] + 1] = S end
+  for _, at in ipairs(PAPER) do BACK[at[1] + 1][at[2] + 1] = W end
+
+  local ctx = fakeCtx({ ["battle/redb.png"] = BACK })
+  chunk(MOD .. "transforms.lua")(ctx)
+  local skin = ctx.written["greenskin/battle/redb.png"].out
+  local flat = ctx.written["green/battle/redb.png"].out
+
+  -- the NECK and jaw, below the cap
+  eq(hex(skin[15][17]), "f0a363", "the neck's light shade becomes skin")
+  eq(hex(skin[16][12]), "ad7547",
+    "the jaw's shading is the outfit's shade, and takes the skin's shadow")
+
+  -- the HAND, which is the whole reason this is a table and not a rule
+  eq(hex(skin[23][26]), "f0a363",
+    "the back of the hand is PAPER and comes out skin: no rule in this "
+    .. "file touches white, so only a table can reach it")
+  eq(hex(skin[21][24]), "ad7547", "...and the crease in it takes the shadow")
+
+  eq(hex(skin[1][1]), "65ba3f", "the jacket is left the outfit's green")
+
+  -- PORTRAIT SKIN is a real toggle on this picture now: before the table
+  -- the two copies were identical and the row did nothing at all
+  eq(hex(flat[23][26]), "ffffff", "the unskinned copy keeps the paper shade")
+  eq(hex(flat[15][17]), "a8dd8a", "...and the light green")
+  ok(hex(skin[23][26]) ~= hex(flat[23][26]),
+    "the two copies of the back pic are no longer the same picture")
 end
 
 io.write("transforms.lua -- the title figure is painted from a table\n")

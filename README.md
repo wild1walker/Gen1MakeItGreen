@@ -210,7 +210,9 @@ instead, which made both hands shadow throughout, and on this art that reads
 as a hand in shadow rather than as a hand.
 
 It still fails closed: no face found, nothing is painted anywhere — not even
-something shaped like a hand. The battle back pic is that case.
+something shaped like a hand. The battle back pic used to be that case, and
+came out one green shape from the cap to the boots; it carries a table of its
+own now, below.
 
 Checked against the real card region by region: face, ear and both hands
 come out skin; cap shading, jacket shoulder, sleeves, collar, hem, trousers
@@ -221,9 +223,9 @@ The recipe writes **both** copies of every portrait — `green/` and
 than deciding a recolour. That is what makes it a switch you can flip in a
 menu instead of one that needs a release to undo.
 
-### The title figure is painted, not reasoned about
+### Two pictures are painted, not reasoned about
 
-One picture does not go by rules at all. Of the 95 pixels that are not plain
+Two pictures do not go by rules at all. Of the 95 pixels that are not plain
 ramp on the title screen's figure, **fourteen come from the paper shade** —
 the lit side of his face, the back of a hand — and eight go to ink. Nothing
 in the recipe touches white, and inventing a rule to fit one sprite is a
@@ -245,6 +247,21 @@ so in a screenshot it is never where it lives — but the rect is an engine
 constant, so the ball keeps vanilla's red by rect rather than by coordinate.
 It is a ball, not the player; the same argument the overworld `MOUTH` rule
 makes.
+
+The **battle back pic** is the second, and it is the same argument again. It
+had no skin on it at all — he was one green shape from the cap to the boots,
+because `skinMask` is built around finding a face and gives up the moment it
+cannot, and the ear, the hands, the glint and the temple are all placed
+relative to the face's own bounds. There is no face on the back of his head.
+What *is* skin on it is his **neck and jaw** below the cap and his **hand and
+forearm** at the lower right — and of those 33 pixels, **eleven come from the
+paper shade**, because the back of the hand is drawn in white. It is one
+fixed 32×32 picture, not a sheet of frames a rule has to generalise over, so
+it gets a table on the same terms as the title figure: 33 coordinates out of
+489 drawn ones, guarded by the shade each was authored against.
+
+Because the two copies of that picture used to come out identical, `PORTRAIT
+SKIN` did nothing to it. It is a real switch on the back pic now.
 
 The title screen's standing figure **is** covered by all this, in one mode. In
 every other mode his rectangle is painted by shade — the colour a file
