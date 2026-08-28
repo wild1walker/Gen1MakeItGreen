@@ -123,7 +123,7 @@ is overridden instead. That zone is tile rows 10–17, which is not free:
   including the one the cart pins. Switch them all off and the title mon
   goes green too, which is what the `TITLE FIGURE` row is for.
 
-### The mouth is not clothing
+### The mouth is not clothing, and the bill is not skin
 
 Red's overworld mouth is one block of the *cap's* colour sitting in the
 middle of his face, so a flat shade remap paints it with the clothes — green
@@ -131,6 +131,17 @@ lips. It cannot be told apart by shade, because it is the same shade; only by
 where it sits. A shade-3 pixel with skin on both sides of it in the same row
 is enclosed by face and is not clothing. The cap and the clothes are bounded
 by black, never by skin, so they are never caught by it.
+
+The bill of the cap is the same problem the other way round. Vanilla draws it
+in the *face's* shade — on red Red the bill and the face are the same colour
+and nobody notices, but put a green cap above it and the hat reads as having
+no bill. A shade-2 pixel sitting directly under a shade-3 one is the bill,
+and it goes with the hat. The face is not caught by it, because a black row
+separates the two.
+
+That second rule runs on the overworld sheets only: there the cap is a
+handful of pixels, but on the 56×56 trainer card there are dozens of
+shade-2-under-shade-3 adjacencies that are shading rather than a bill.
 
 **The title band** is lettering on white, not a sprite, so it gets its own —
 and both greens are dark enough to read as ink at 8px, which the character's

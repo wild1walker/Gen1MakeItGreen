@@ -125,26 +125,45 @@ end
 -- the whole problem -- so only where it sits can tell them apart.
 local W, S, O, K = 255, 170, 85, 0
 local FACE = {
-  { K, S, S, S, S, S, K },
+  { K, O, O, O, O, O, K },   -- the cap: shade 3
+  { K, S, S, S, S, S, K },   -- the bill: shade 2, directly under the cap
+  { K, K, K, K, K, K, K },
+  { K, S, S, S, S, S, K },   -- the face: shade 2, black above it
   { K, S, K, S, K, S, K },   -- eyes
   { K, S, S, O, S, S, K },   -- the mouth: shade 3, skin either side
   { K, K, O, O, O, K, K },   -- the collar: shade 3 bounded by black
 }
 
-io.write("transforms.lua -- the mouth\n")
+local function hex(c) return ("%02x%02x%02x"):format(c[1], c[2], c[3]) end
+
+io.write("transforms.lua -- the mouth and the bill\n")
 do
   local ctx = fakeCtx({ ["sprites/red.png"] = FACE })
   chunk(MOD .. "transforms.lua")(ctx)
   local out = ctx.written["green/sprites/red.png"]
   ok(out ~= nil and out.out ~= nil, "the per-pixel path ran")
   local px = out and out.out
-  local function hex(c) return ("%02x%02x%02x"):format(c[1], c[2], c[3]) end
-  eq(px and hex(px[3][4]), "f0a363",
+  eq(px and hex(px[6][4]), "f0a363",
     "the mouth is skin, not green -- it has skin on both sides")
-  eq(px and hex(px[4][3]), "65ba3f",
+  eq(px and hex(px[7][3]), "65ba3f",
     "the collar is still green -- black either side, not skin")
-  eq(px and hex(px[1][2]), "f0a363", "the face is skin")
-  eq(px and hex(px[2][3]), "000000", "an eye stays black")
+  eq(px and hex(px[2][3]), "65ba3f",
+    "the bill goes with the hat -- shade 2, but directly under the cap")
+  eq(px and hex(px[4][3]), "f0a363",
+    "the face is still skin -- black above it, not cap")
+  eq(px and hex(px[5][3]), "000000", "an eye stays black")
+end
+
+io.write("transforms.lua -- the bill rule is overworld-only\n")
+do
+  -- On the 56x56 card there are dozens of shade-2-under-shade-3 adjacencies
+  -- that are shading rather than a bill, so the rule does not run there.
+  local ctx = fakeCtx({ ["trainer_card/red.png"] = FACE })
+  chunk(MOD .. "transforms.lua")(ctx)
+  local px = ctx.written["green/trainer_card/red.png"].out
+  eq(hex(px[2][3]), "f0a363",
+    "shade 2 under the cap stays skin on the trainer card")
+  eq(hex(px[6][4]), "f0a363", "...and the mouth rule still applies there")
 end
 
 io.write("transforms.lua\n")

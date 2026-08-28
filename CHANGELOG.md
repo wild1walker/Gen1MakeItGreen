@@ -2,7 +2,24 @@
 
 All notable changes to this mod are recorded here, newest first.
 
-## [1.1.2] - unreleased
+## [1.1.3] - unreleased
+
+### Fixed
+
+- **The cap's bill was skin-coloured.** Vanilla draws it in the same shade as
+  the face, so on red Red the bill and the face are the same colour and
+  nobody notices; put a green cap above it and the hat reads as having no
+  bill at all. A shade-2 pixel sitting directly under a shade-3 one is the
+  bill, and it goes with the hat. The face is not caught by it — there is a
+  black row between the bill and the face, so what is above the face is black
+  rather than cap.
+
+  The rule runs on the overworld sheets only. There the cap is a handful of
+  pixels and "skin directly under cap" means one thing; on the 56×56 trainer
+  card there are dozens of shade-2-under-shade-3 adjacencies that are shading
+  rather than a bill, and every one of them would turn green.
+
+## [1.1.2] - 2026-08-28
 
 ### Fixed
 

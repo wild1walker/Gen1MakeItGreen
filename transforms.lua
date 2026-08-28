@@ -112,14 +112,16 @@ return function(ctx)
     return 4
   end
 
-  local function mouthAware(rel)
+  local function mouthAware(rel, brim)
     local src = ctx.readImage(rel)
     local out = ctx.readImage(rel)
-    local w = src:getDimensions()
+    local w, h = src:getDimensions()
 
     local function shadeAt(x, y)
-      if x < 0 or x >= w then return nil end
-      return shadeOf((src:getPixel(x, y)))
+      if x < 0 or x >= w or y < 0 or y >= h then return nil end
+      local r, _, _, a = src:getPixel(x, y)
+      if a == 0 then return nil end
+      return shadeOf(r)
     end
 
     -- the first shade either side that is not shade 3, within REACH
@@ -136,7 +138,14 @@ return function(ctx)
       local shade = shadeOf(r)
       local colour = WILD_GREEN[shade]
       if shade == 3 and neighbour(x, y, -1) == 2 and neighbour(x, y, 1) == 2 then
+        -- a mouth: the outfit's shade, but enclosed by face
         colour = WILD_GREEN[2]
+      elseif brim and shade == 2 and shadeAt(x, y - 1) == 3 then
+        -- the cap's bill: the face's shade, but sitting directly under the
+        -- cap.  Vanilla draws it in the same shade as the skin, so it is the
+        -- same colour as his face there too -- which on a green cap reads as
+        -- the hat having no bill at all.  It goes with the hat instead.
+        colour = WILD_GREEN[3]
       end
       return colour[1] / 255, colour[2] / 255, colour[3] / 255, a
     end)
@@ -148,7 +157,13 @@ return function(ctx)
     -- an import that never made it, not a broken install: skip it and leave
     -- that picture as the base game drew it.
     if ctx.exists(rel) then
-      local ok, image = pcall(mouthAware, rel)
+      -- The bill rule is for the overworld sheets only.  There the cap is a
+      -- handful of pixels and "skin directly under the cap" means one thing;
+      -- on the 56x56 trainer card there are dozens of shade-2-under-shade-3
+      -- adjacencies that are shading, not a bill, and every one of them would
+      -- turn green.
+      local brim = rel:match("^sprites/") ~= nil
+      local ok, image = pcall(mouthAware, rel, brim)
       if not ok then
         image = ctx.recolor(ctx.readImage(rel), WILD_GREEN)
       end
