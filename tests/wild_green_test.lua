@@ -303,6 +303,49 @@ do
     "and with no face found, a hand-shaped patch is left alone too")
 end
 
+io.write("transforms.lua -- the title figure is painted from a table\n")
+do
+  -- The one picture the rules cannot express: fourteen of its skin pixels
+  -- come from the PAPER shade and eight go to ink, and nothing in this file
+  -- touches white.  So it carries a table instead -- row, column, the shade
+  -- that must be under it, and the tone -- and the shade is the guard.
+  --
+  -- Here every cell is paper, so almost none of the table's entries find the
+  -- shade they were authored against and the picture falls through to the
+  -- ordinary rules, which find no face and paint nothing.
+  local FLAT = {}
+  for y = 1, 30 do
+    FLAT[y] = {}
+    for x = 1, 41 do FLAT[y][x] = W end
+  end
+  local ctx = fakeCtx({ ["title/player.png"] = FLAT })
+  chunk(MOD .. "transforms.lua")(ctx)
+  local skin = ctx.written["greenskin/title/player.png"]
+  ok(skin ~= nil, "the title figure is written like any other portrait")
+  -- 26,2 is one of the entries whose shade IS paper, so it would match on
+  -- this all-paper cache; what stops it is that only a handful of the 95 do
+  eq(hex(skin.out[27][3]), "ffffff",
+    "a cache whose figure is not the one the table was drawn against is "
+    .. "left to the rules, not painted at coordinates that mean nothing")
+
+  -- and the POKE BALL, which the engine lifts out of this file at (0,16)
+  -- and throws on its own: it keeps vanilla's red rather than going green
+  local BALL = {}
+  for y = 1, 30 do
+    BALL[y] = {}
+    for x = 1, 41 do BALL[y][x] = O end
+  end
+  local ctx2 = fakeCtx({ ["title/player.png"] = BALL })
+  chunk(MOD .. "transforms.lua")(ctx2)
+  local out = ctx2.written["greenskin/title/player.png"].out
+  eq(hex(out[18][4]), "d84030", "the ball's mid shade is vanilla's red")
+  eq(hex(out[24][4]), "d84030", "...to the bottom row of its 8x8")
+  eq(hex(out[17][4]), "d84030", "...from its top row, which is row 16")
+  eq(hex(out[16][4]), "65ba3f", "the row above the ball is his outfit")
+  eq(hex(out[25][4]), "65ba3f", "...and so is the row below it")
+  eq(hex(out[20][9]), "65ba3f", "...and the column beside it")
+end
+
 io.write("transforms.lua -- every picture is covered\n")
 do
   -- The hook only swaps what the recipe writes, so a picture named in one

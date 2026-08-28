@@ -2,6 +2,35 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.14.0] - 2026-08-28
+
+### Changed
+
+- **The title figure is painted from a table, not from rules.** The rules
+  could not express it: of the 95 pixels that are not plain ramp on that
+  figure, fourteen come from the *paper* shade — the lit side of his face,
+  the back of a hand — and eight go to ink. Nothing in the recipe touches
+  white, and a rule invented to fit one sprite is a drawing with extra
+  steps. So it is a drawing, authored by eye against the figure on screen
+  and encoded as *row, column, the shade that must be under it, and the
+  tone*.
+
+  It ships no vanilla pixels: the art stays in the player's cache, and what
+  the table carries is where a face is. The shade is the guard — a cache
+  whose figure differs fails those checks and falls through to the ordinary
+  rules rather than being painted at coordinates that mean nothing there.
+
+- **The Poké Ball keeps vanilla's red.** The engine lifts an 8×8 out of that
+  file at `(0,16)` and throws it on a y of its own, so in a screenshot it is
+  never where it lives — but the rect is an engine constant, so the ball is
+  coloured by rect and never needs a coordinate. It is a ball, not the
+  player, which is the same argument the overworld `MOUTH` rule makes.
+
+### Notes
+
+- Checked against the authored figure pixel for pixel: **0 of 2,289
+  differ**, outside the ball's own rect.
+
 ## [1.13.0] - 2026-08-28
 
 ### Fixed

@@ -466,6 +466,88 @@ return function(ctx)
     return skin, detail
   end
 
+  -- ------- title/player.png, which is painted rather than reasoned about
+  --
+  -- Every other picture here is recoloured by rules, because a rule works on
+  -- whatever the player's cache actually holds.  This one is not, and the
+  -- reason is that the rules cannot express it.  Of the 95 pixels that are
+  -- not plain ramp on that figure, FOURTEEN come from the paper shade -- the
+  -- lit side of his face and the back of a hand, drawn in white -- and eight
+  -- go to ink.  No rule in this file touches white at all, and inventing one
+  -- to fit a single sprite is not a rule, it is a drawing with extra steps.
+  --
+  -- So it is a drawing.  The table below is a list of "at this row and
+  -- column, with this shade underneath, paint this", authored by eye against
+  -- the figure on the title screen.  It carries no pixels of the vanilla art
+  -- -- the art stays in the player's own cache, as everything here does, and
+  -- the other two thousand pixels of this picture are still whatever their
+  -- import wrote.  What it carries is where a face is.
+  --
+  -- Each entry is row.col.shade.tone:
+  --
+  --   shade  what must be under it: 1 paper, 2 light, 3 mid, 4 ink
+  --   tone   1 skin, 2 the skin's shadow, 3 ink
+  --
+  -- The shade is the guard, and it is why this is safe to ship.  Every entry
+  -- has to find the shade it was authored against; a cache whose figure
+  -- differs -- a translation, a conversion, a different rip -- fails those
+  -- checks and the picture falls through to the ordinary rules instead of
+  -- being painted somewhere it should not be.  ENTRIES_MIN is how much of it
+  -- has to match before it is believed at all.
+  local TITLE_PIC = "title/player.png"
+  local TITLE_MIN = 0.9
+  local TITLE_TONE = { WILD_GREEN[2], SKIN_DARK, { 0x00, 0x00, 0x00 } }
+  local TITLE_TABLE =
+    "13.22.3.2 13.23.2.1 13.26.3.2 13.27.3.2 13.30.3.2 14.18.3.2 "
+    .. "14.21.2.1 14.22.2.1 14.23.2.1 14.26.2.1 14.29.2.1 15.18.2.1 "
+    .. "15.21.2.1 15.22.2.1 15.23.2.1 15.24.2.1 15.25.2.1 15.26.2.1 "
+    .. "15.29.3.2 16.18.2.1 16.19.2.1 16.20.2.1 16.21.3.2 16.22.2.1 "
+    .. "16.23.2.1 16.24.2.1 16.25.2.1 17.18.2.1 17.19.2.1 17.20.2.1 "
+    .. "17.21.2.1 17.22.2.1 17.23.2.1 17.24.2.1 17.25.2.1 18.19.3.2 "
+    .. "18.20.2.1 18.21.2.1 18.22.3.2 18.24.2.1 19.21.3.2 19.22.2.1 "
+    .. "19.23.2.1 19.24.2.1 20.24.3.2 21.24.2.1 22.23.2.1 22.24.2.1 "
+    .. "22.25.2.1 24.24.3.3 25.23.3.3 25.25.3.3 26.1.2.1 26.2.1.2 "
+    .. "26.24.3.3 27.2.2.1 27.4.2.1 27.6.1.2 27.12.3.3 27.13.1.2 27.14.2.1 "
+    .. "27.23.3.3 27.25.3.3 28.1.2.1 28.4.2.1 28.6.2.1 28.11.2.1 28.12.1.2 "
+    .. "28.13.1.2 28.14.2.1 28.15.2.1 28.24.3.3 29.11.2.1 29.12.2.1 "
+    .. "29.13.2.1 29.14.2.1 30.11.2.1 30.12.2.1 30.13.2.1 31.13.3.2 "
+    .. "31.33.2.2 31.34.1.1 32.33.2.2 32.34.1.1 32.35.1.1 32.36.3.2 "
+    .. "33.33.2.2 33.34.2.2 33.35.1.1 34.34.2.2 38.34.1.1 39.34.1.1 "
+    .. "39.37.1.1 40.36.1.1 40.37.1.1 "
+
+  -- The engine lifts an 8x8 POKE BALL out of this file at (0,16) and draws
+  -- it on its own, at a y of its own that moves while the title animates
+  -- (TitleState: newQuad(0, 16, 8, 8), drawn at 82, self.ballY).  It is a
+  -- ball, not the player -- so it keeps vanilla's own red rather than going
+  -- green with his jacket, the same argument the overworld MOUTH rule makes.
+  --
+  -- No coordinates for it: the rect is the engine's constant, so the ball is
+  -- wherever the file says and the table never has to name it.  Which is
+  -- just as well, because in a screenshot it is never where it lives.
+  local BALL_RAMP = {
+    { 0xff, 0xff, 0xff },
+    { 0xec, 0xa8, 0x78 },
+    { 0xd8, 0x40, 0x30 },
+    { 0x00, 0x00, 0x00 },
+  }
+  local BALL_X, BALL_Y, BALL_W, BALL_H = 0, 16, 8, 8
+
+  -- -> a mask of tones for the one picture that has a table, or nil
+  local function titleMask(shade, w, h)
+    local mask, found, total = {}, 0, 0
+    for row, col, want, tone in TITLE_TABLE:gmatch("(%d+)%.(%d+)%.(%d+)%.(%d+)") do
+      row, col, want, tone = tonumber(row), tonumber(col), tonumber(want), tonumber(tone)
+      total = total + 1
+      if row < h and col < w and shade[row][col] == want then
+        found = found + 1
+        mask[row] = mask[row] or {}
+        mask[row][col] = TITLE_TONE[tone]
+      end
+    end
+    if total == 0 or found / total < TITLE_MIN then return nil end
+    return mask
+  end
+
   local function recoloured(rel, field, wantSkin)
     local ramp = field and WILD_GREEN or WILD_GREEN_PIC
     local bill = field
@@ -542,14 +624,25 @@ return function(ctx)
 
     -- only asked for on the skinned copy of a portrait; nil is the answer
     -- that leaves the picture monochrome
-    local skin, detail
-    if (not field) and wantSkin then skin, detail = skinMask(shade, w, h) end
+    local skin, detail, painted
+    if (not field) and wantSkin then
+      if rel == TITLE_PIC then painted = titleMask(shade, w, h) end
+      if not painted then skin, detail = skinMask(shade, w, h) end
+    end
+    local ball = rel == TITLE_PIC
 
     out:mapPixel(function(x, y, r, g, b, a)
       if a == 0 then return r, g, b, a end
       local s = shade[y][x]
       local colour = ramp[s]
-      if not field then
+      if ball and x >= BALL_X and x < BALL_X + BALL_W
+          and y >= BALL_Y and y < BALL_Y + BALL_H then
+        -- the ball the title screen throws: vanilla's own, not his outfit's
+        colour = BALL_RAMP[s]
+      elseif painted then
+        -- the one picture with a table: what it says, or the plain ramp
+        colour = (painted[y] and painted[y][x]) or ramp[s]
+      elseif not field then
         -- The portrait: the ramp, and the skin if any was found.  Skin is
         -- the skin tone; the shadow tone is for the pieces the DETAIL pass
         -- picked out -- the brow, the mouth, the ear's underside, the temple

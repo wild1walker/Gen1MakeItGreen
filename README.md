@@ -205,7 +205,32 @@ The recipe writes **both** copies of every portrait — `green/` and
 than deciding a recolour. That is what makes it a switch you can flip in a
 menu instead of one that needs a release to undo.
 
-The title screen's standing figure **is** covered by it, in one mode. In
+### The title figure is painted, not reasoned about
+
+One picture does not go by rules at all. Of the 95 pixels that are not plain
+ramp on the title screen's figure, **fourteen come from the paper shade** —
+the lit side of his face, the back of a hand — and eight go to ink. Nothing
+in the recipe touches white, and inventing a rule to fit one sprite is a
+drawing with extra steps. So it is a drawing: a table of *row, column, the
+shade that must be under it, and the tone*, authored by eye against that
+figure.
+
+It ships no pixels of the vanilla art — the art stays in the player's cache
+like everything else here, and the other 2,200 pixels of that picture are
+still whatever their import wrote. What it carries is where a face is. **The
+shade is the guard**: every entry has to find the shade it was drawn
+against, and a cache whose figure differs — a translation, a conversion, a
+different rip — fails those checks and falls through to the ordinary rules
+rather than being painted at coordinates that mean nothing there.
+
+The **Poké Ball** is not in the table. The engine lifts an 8×8 out of that
+file at `(0,16)` and throws it on a y of its own while the title animates,
+so in a screenshot it is never where it lives — but the rect is an engine
+constant, so the ball keeps vanilla's red by rect rather than by coordinate.
+It is a ball, not the player; the same argument the overworld `MOUTH` rule
+makes.
+
+The title screen's standing figure **is** covered by all this, in one mode. In
 every other mode his rectangle is painted by shade — the colour a file
 carries is thrown away before it reaches the screen — so `MEWMON` does that
 work. Under `ADVANCED` the zone pass never reaches him, and `main.lua` hands
