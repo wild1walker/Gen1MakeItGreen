@@ -210,6 +210,14 @@ way out, in the same white / light green / green / black the trainer card
 uses. Out of `ADVANCED` it hands the grey art back and `MEWMON` has him
 again.
 
+Reading those pixels back is not one call: under LÖVE 11 a graphics `Image`
+does not keep the `ImageData` it was built from, so the art is drawn into a
+canvas of its own size and read back from there, with the canvas, blend
+mode, draw colour and transform stack all put back afterwards — that draw
+can happen mid-frame. 1.4.0 called `getData`, gave up when it was not there,
+and changed nothing on screen; 1.6.0 is where the figure actually turns
+green.
+
 It is the mod's one engine internal, and the reason it declares
 `engine_internals`. Every step of it is guarded: without the module, without
 `love.graphics`, without a clonable `ImageData`, the figure is exactly what

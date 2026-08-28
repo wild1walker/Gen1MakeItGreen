@@ -2,6 +2,37 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.6.0] - 2026-08-28
+
+### Fixed
+
+- **The title figure's bake never ran, so 1.4.0 changed nothing on screen.**
+  It read the art with `Image:getData` — and under LÖVE 11 a graphics
+  `Image` does not keep the `ImageData` it was built from and has no
+  `getData` at all. The call failed on the first frame, the failure was
+  cached, and the figure kept the red bake downstream of it. The wrap was
+  fine; the pixels were never reachable.
+
+  They come off a canvas now: the art is drawn into a canvas of its own size
+  at the origin and read back. `getData` is still tried first, because where
+  it exists it is cheaper and touches no graphics state. Everything the
+  readback touches — canvas, blend mode, draw colour, transform stack — is
+  put back, because `currentSprite` can be called mid-draw and a canvas left
+  behind is a corrupted frame.
+
+  The test stub was the reason this shipped: its fake `Image` had `getData`,
+  so it exercised a path the engine does not have. It is the LÖVE 11 shape
+  now, with a canvas the readback actually drives, and there is a case for
+  the old shape beside it.
+
+### Changed
+
+- The load line names the row states and the prefix the pics are read from
+  (`player=GREEN portrait_skin=true ribbon=true -- pics are read from
+  assets/generated/greenskin/`), and the title figure says whether it baked
+  or could not read the art. 1.4.0 logged `wrapped` and was still red; that
+  is the line that was missing.
+
 ## [1.5.0] - 2026-08-28
 
 ### Added

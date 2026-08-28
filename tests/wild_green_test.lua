@@ -661,33 +661,38 @@ end
 local RED_BAKE = { { 255, 255, 255 }, { 236, 168, 120 },
                    { 216, 64, 48 }, { 56, 64, 120 } }
 
+-- Both verbs on every copy: a canvas readback hands back a real ImageData
+-- that can be mapped straight away, and a cloned one can be too.
 local function fakeImageData(rows)
   local data = { rows = rows }
-  function data:clone()
-    local copy = { rows = self.rows }
-    copy.clone = data.clone
-    function copy:mapPixel(fn)
-      self.out = {}
-      for y = 1, #self.rows do
-        self.out[y] = {}
-        for x = 1, #self.rows[y] do
-          local v = self.rows[y][x] / 255
-          local r, g, b, a = fn(x - 1, y - 1, v, v, v, 1)
-          self.out[y][x] = { math.floor(r * 255 + .5),
-                             math.floor(g * 255 + .5),
-                             math.floor(b * 255 + .5), a }
-        end
+  function data:mapPixel(fn)
+    self.out = {}
+    for y = 1, #self.rows do
+      self.out[y] = {}
+      for x = 1, #self.rows[y] do
+        local v = self.rows[y][x] / 255
+        local r, g, b, a = fn(x - 1, y - 1, v, v, v, 1)
+        self.out[y][x] = { math.floor(r * 255 + .5),
+                           math.floor(g * 255 + .5),
+                           math.floor(b * 255 + .5), a }
       end
-      return self
     end
-    return copy
+    return self
   end
+  function data:clone() return fakeImageData(self.rows) end
   return data
 end
 
-local function fakeTitleImage(rows)
+-- `getData` is the LOVE 10 shape.  Under LOVE 11 a graphics Image does NOT
+-- keep the ImageData it was built from and has no getData at all, so the
+-- pixels have to come back off a canvas -- which is the whole of the 1.4.0
+-- bug: it called getData, gave up when it was not there, and left the figure
+-- exactly as it found it.  `legacy` picks which engine the stub is.
+local function fakeTitleImage(rows, legacy)
   local image = { rows = rows, kind = "raw" }
-  function image:getData() return fakeImageData(self.rows) end
+  if legacy then
+    function image:getData() return fakeImageData(self.rows) end
+  end
   function image:getDimensions() return #self.rows[1], #self.rows end
   function image:setFilter() end
   return image
@@ -734,13 +739,44 @@ local function titleScreen(options, mode, lazy)
   -- left installed on purpose: main.lua reads the `love` global when it
   -- bakes, which is at currentSprite time and not at load
   local made = {}
-  _G.love = { graphics = { newImage = function(data)
-    local image = { data = data, kind = "baked" }
-    function image:getDimensions() return #self.data.rows[1], #self.data.rows end
-    function image:setFilter() end
-    made[#made + 1] = image
-    return image
-  end } }
+  local gfx = { canvas = nil, blend = "alpha", alphaMode = "alphamultiply",
+                colour = { 1, 1, 1, 1 }, depth = 0, drawn = nil, leaked = nil }
+  _G.love = { graphics = {
+    newImage = function(data)
+      local image = { data = data, kind = "baked" }
+      function image:getDimensions()
+        return #self.data.rows[1], #self.data.rows
+      end
+      function image:setFilter() end
+      made[#made + 1] = image
+      return image
+    end,
+    -- the canvas readback, close enough to answer whether main.lua drives it
+    -- correctly: the pixels come back, and the screen is put back
+    newCanvas = function(w, h)
+      local canvas = { w = w, h = h }
+      function canvas:newImageData()
+        return fakeImageData(gfx.drawn and gfx.drawn.rows or {})
+      end
+      function canvas:release() end
+      return canvas
+    end,
+    getCanvas = function() return gfx.canvas end,
+    setCanvas = function(c) gfx.canvas = c end,
+    clear = function() end,
+    getBlendMode = function() return gfx.blend, gfx.alphaMode end,
+    setBlendMode = function(b, a) gfx.blend, gfx.alphaMode = b, a end,
+    getColor = function() return unpack(gfx.colour) end,
+    setColor = function(r, g, b, a) gfx.colour = { r, g, b, a } end,
+    push = function() gfx.depth = gfx.depth + 1 end,
+    origin = function() end,
+    pop = function() gfx.depth = gfx.depth - 1 end,
+    draw = function(image)
+      -- drawing into a canvas that is not set is the mistake this catches
+      if not gfx.canvas then gfx.leaked = "drew with no canvas set" end
+      gfx.drawn = image
+    end,
+  } }
 
   local mod = fakeMod(options)
   chunk(MOD .. "main.lua")(mod)
@@ -750,8 +786,9 @@ local function titleScreen(options, mode, lazy)
 
   return {
     mod = mod, TitleState = TitleState, PaletteFX = PaletteFX,
-    marks = marks, inner = inner, made = made,
-    -- one 4x2 strip in the four grey shades the importer writes
+    marks = marks, inner = inner, made = made, gfx = gfx,
+    -- one 4x2 strip in the four grey shades the importer writes, in the
+    -- shape LOVE 11 hands over: no getData on it
     raw = fakeTitleImage({ { W, S, O, K }, { W, S, O, K } }),
   }
 end
@@ -789,6 +826,43 @@ do
   screen.TitleState.currentSprite(title)
   eq(title.player, first, "a second frame keeps the same baked image")
   eq(screen.inner.calls, 2, "...and still runs the inner link")
+end
+
+io.write("main.lua -- reading an Image's pixels back\n")
+do
+  -- 1.4.0 called Image:getData and gave up when it was not there.  Under
+  -- LOVE 11 it never is: the texture does not keep the ImageData it was
+  -- built from.  So the bake failed on the first frame, cached the failure,
+  -- and the figure kept the red one downstream of it -- the release changed
+  -- nothing on screen.  The pixels come off a canvas now.
+  local screen = titleScreen({ player = "green", ribbon = true }, "redpp")
+  local title = { player = screen.raw }
+  ok(screen.raw.getData == nil,
+    "the stub is the LOVE 11 shape: no getData on a graphics Image")
+
+  screen.TitleState.currentSprite(title)
+  ok(title.player ~= nil and title.player.kind == "baked",
+    "the figure is baked anyway -- the pixels came off a canvas")
+  eq(hex(title.player.data.out[1][3]), "65ba3f",
+    "...and they are the right pixels, in the outfit green")
+  eq(screen.gfx.drawn, screen.raw,
+    "the art itself was the thing drawn into the canvas")
+
+  -- and the screen is handed back exactly as it was found: currentSprite can
+  -- run mid-draw, so a canvas or a blend mode left behind is a corrupted frame
+  ok(screen.gfx.leaked == nil, "nothing was drawn with no canvas set")
+  eq(screen.gfx.canvas, nil, "the canvas is put back")
+  eq(screen.gfx.blend, "alpha", "the blend mode is put back")
+  eq(screen.gfx.depth, 0, "the transform stack is balanced")
+  eq(screen.gfx.colour[1], 1, "the draw colour is put back")
+
+  -- the old shape still works, and never touches the graphics state at all
+  local legacy = titleScreen({ player = "green", ribbon = true }, "redpp")
+  local old = { player = fakeTitleImage({ { W, S, O, K } }, true) }
+  legacy.TitleState.currentSprite(old)
+  ok(old.player ~= nil and old.player.kind == "baked",
+    "an Image that does have getData is baked through it")
+  eq(legacy.gfx.drawn, nil, "...and no canvas is touched for it")
 end
 
 io.write("main.lua -- the title figure out of REDPP\n")

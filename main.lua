@@ -351,13 +351,67 @@ return function(mod)
     return 4
   end
 
+  -- ------- getting an Image's pixels back, which is not one call
+  --
+  -- love.graphics.Image has no getData under LOVE 11: the texture does not
+  -- keep the ImageData it was built from.  1.4.0 called it and gave up when
+  -- it was not there, so the bake below failed on the very first frame,
+  -- cached the failure, and left the figure exactly as it was -- which is
+  -- why 1.4.0 changed nothing on screen.
+  --
+  -- The way back to the pixels is to draw the image into a canvas of its own
+  -- size and read that. Two things make it safe: everything it touches is
+  -- put back, and the blit runs at the origin -- currentSprite can be called
+  -- mid-draw with the screen's own transform still on the stack, and drawing
+  -- through that transform pushes the art out of a 1:1 canvas and reads back
+  -- nothing at all.
+  --
+  -- getData is still tried first, because where it exists it is cheaper and
+  -- needs no graphics state at all.  A clone either way: the title art is
+  -- cached and other draws read the same object, so mapping it in place
+  -- would recolour theirs too.
+  local function pixelsOf(image)
+    local okData, data = pcall(image.getData, image)
+    if okData and data then
+      local okClone, clone = pcall(data.clone, data)
+      if okClone and clone then return clone end
+    end
+
+    local g = type(love) == "table" and love.graphics or nil
+    if not (g and g.newCanvas and g.getCanvas) then return nil end
+    local okDim, w, h = pcall(image.getDimensions, image)
+    if not (okDim and w and h and w > 0 and h > 0) then return nil end
+
+    local wasCanvas = g.getCanvas()
+    local blend, alphaMode = g.getBlendMode()
+    local cr, cg, cb, ca = g.getColor()
+    local out
+    pcall(function()
+      local canvas = g.newCanvas(w, h, { dpiscale = 1 })
+      g.setCanvas(canvas)
+      g.clear(0, 0, 0, 0)
+      g.setBlendMode("replace", "premultiplied")
+      g.setColor(1, 1, 1, 1)
+      g.push()
+      g.origin()
+      g.draw(image, 0, 0)
+      g.pop()
+      g.setCanvas()
+      out = canvas:newImageData()
+      if canvas.release then pcall(canvas.release, canvas) end
+    end)
+    -- put the screen back whether or not any of that worked
+    if wasCanvas then pcall(g.setCanvas, wasCanvas) else pcall(g.setCanvas) end
+    pcall(g.setBlendMode, blend or "alpha", alphaMode)
+    pcall(g.setColor, cr or 1, cg or 1, cb or 1, ca or 1)
+    return out
+  end
+
   -- A PRIVATE copy, recoloured.  Never the shared ImageData in place: the
   -- title art is cached and other draws read the same object.
   local function greenBake(raw)
-    local okData, data = pcall(raw.getData, raw)
-    if not (okData and data) then return nil end
-    local okClone, copy = pcall(data.clone, data)
-    if not (okClone and copy) then return nil end
+    local copy = pixelsOf(raw)
+    if not copy then return nil end
     local okMap = pcall(function()
       copy:mapPixel(function(_, _, r, g, b, a)
         if a == 0 then return r, g, b, a end
@@ -406,6 +460,12 @@ return function(mod)
       if PaletteFX.mode == "redpp" then
         if title.__wildGreenBaked == nil then
           title.__wildGreenBaked = greenBake(raw) or false
+          -- once per visit to that screen, and the line 1.4.0 needed: the
+          -- wrap succeeded there and the BAKE was what failed, silently, a
+          -- frame later.  "wrapped" was true and the figure was still red.
+          mod.log:info("title figure: %s", title.__wildGreenBaked
+            and "baked green"
+            or "could not read the art, left as it was")
         end
         local baked = title.__wildGreenBaked
         if not baked then return end
@@ -476,6 +536,11 @@ return function(mod)
   -- only recolours what the cache actually carries, and which pictures those
   -- are is the difference between "this mod is broken" and "your import
   -- never wrote that file".
-  mod.log:info("player=%s ribbon=%s -- recoloured art is read from %s",
-    green and "GREEN" or "RED", tostring(option("ribbon", true)), GREEN)
+  -- Which rows are set, and which set of files the pics are read from.  The
+  -- prefix is the answer to "did PORTRAIT SKIN take": greenskin/ is the
+  -- skinned copies, green/ the flat ones -- and a build that does not name a
+  -- prefix at all is a build older than the row.
+  mod.log:info("player=%s portrait_skin=%s ribbon=%s -- pics are read from %s",
+    green and "GREEN" or "RED", tostring(skinned),
+    tostring(option("ribbon", true)), skinned and SKINNED or GREEN)
 end
