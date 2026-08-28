@@ -227,6 +227,9 @@ return function(ctx)
   local GLINT_MAX = 2      -- a speck of the LIGHT shade inside a hand
   local TEMPLE_MAX = 3     -- and the specks between the hat and the face
   local TEMPLE_ROWS = 3    -- which is all the higher this ever looks
+  local SIDEBURN_FACE = 4  -- skin running this far the other way: a cheek
+  local SIDEBURN_OUT = { -1, 1 }   -- which way the ear is, hoisted out of
+                                   -- the per-pixel test
 
   -- every 4-connected patch of one shade
   local function connected(shade, w, h, want)
@@ -655,6 +658,42 @@ return function(ctx)
       return not (isBill[y - 1] and isBill[y - 1][x])
     end
 
+    -- The sideburn: the tip of the hair between the cap and the ear.
+    --
+    -- Vanilla draws it as ONE pixel and does not draw it the same in both
+    -- forward-facing walk frames -- skin in the one with his arms out, ink
+    -- in the other.  In the grey art that alternation is a light pixel and
+    -- a black one against a grey cap and reads as shading; here shade 2 is
+    -- flesh and shade 3 is a green cap, so the same two pixels swing
+    -- between orange and black and read as the hair flickering.
+    --
+    -- So it is held to skin in both frames.  Nothing is darkened: the frame
+    -- that already draws them skin is untouched, and this repaints only the
+    -- frame that draws them ink.
+    --
+    -- Eleven conditions, because a looser test also finds the hairline
+    -- above the eye in the profile frames, which is hair and must stay
+    -- black.  What is only true of the sideburn is the EAR: on the row
+    -- below, outward, an outline pixel, one pixel of skin, then outline
+    -- again -- with the cheek running the other way, which is what says
+    -- this is the head's outer edge and not somewhere in the middle of it.
+    local function sideburnAt(x, y)
+      if shadeAt(x, y - 1) ~= 4 or shadeAt(x, y - 2) ~= 3 then return false end
+      if shadeAt(x - 1, y) ~= 4 or shadeAt(x + 1, y) ~= 4 then return false end
+      if shadeAt(x, y + 1) ~= 2 then return false end
+      for _, d in ipairs(SIDEBURN_OUT) do
+        if shadeAt(x + d, y + 1) == 4 and shadeAt(x + 2 * d, y + 1) == 2
+            and shadeAt(x + 3 * d, y + 1) == 4 then
+          local cheek = true
+          for k = 1, SIDEBURN_FACE do
+            if shadeAt(x - d * k, y + 1) ~= 2 then cheek = false break end
+          end
+          if cheek then return true end
+        end
+      end
+      return false
+    end
+
     out:mapPixel(function(x, y, r, g, b, a)
       if a == 0 then return r, g, b, a end
       local s = shade[y][x]
@@ -688,6 +727,10 @@ return function(ctx)
         colour = MOUTH
       elseif s == 2 and isBill[y] and isBill[y][x] then
         colour = BILL
+      elseif s == 4 and sideburnAt(x, y) then
+        -- the hair's tip between cap and ear: skin in every frame, so it
+        -- stops flickering as he walks
+        colour = ramp[2]
       end
       return colour[1] / 255, colour[2] / 255, colour[3] / 255, a
     end)

@@ -320,6 +320,31 @@ it was before, and nothing else in the mod is affected.
 
 [crystal]: https://github.com/distilledorion-sketch/crystal_animated_sprites_with_shiny_visuals
 
+### The sideburn does not flicker
+
+Vanilla draws the tip of the hair between the cap and the ear as one pixel,
+and does not draw it the same in both forward-facing walk frames — skin in
+the one with his arms out, ink in the other. In the grey art that is a light
+pixel alternating with a black one against a grey cap, which reads as
+shading. Here shade 2 is flesh and shade 3 is a green cap, so the same two
+pixels swing between orange and black and read as the hair flickering as he
+walks.
+
+So it is held to skin in both frames. Nothing is darkened: the frame that
+already draws them skin is untouched, and only the frame that draws them ink
+is repainted.
+
+Telling that pixel from the hairline above the eye in the *profile* frames —
+which is hair and must stay black — takes eleven conditions, because the
+obvious ones are true of both: ink, cap above, face below, ink either side.
+What is only true of the sideburn is the **ear**. On the row below, looking
+outward, there is an outline pixel, then one pixel of skin, then outline
+again; and the cheek runs the *other* way for at least four pixels, which is
+what says this is the head's outer edge rather than somewhere in the middle
+of it. Both halves are load-bearing: the test sheet carries a hairline with a
+cheek and no ear, and an ear with no cheek behind it, and drop either half of
+the rule and one of them turns to flesh.
+
 ### The mouth is not clothing, and the bill is not skin
 
 Red's overworld mouth is one block of the *cap's* colour sitting in the

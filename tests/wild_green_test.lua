@@ -150,6 +150,70 @@ local FACE = {
 
 local function hex(c) return ("%02x%02x%02x"):format(c[1], c[2], c[3]) end
 
+-- The sideburn: the hair's tip between the cap and the ear, which vanilla
+-- draws skin in one forward walk frame and ink in the other.  A full 16
+-- columns, because the test reaches three pixels out one way (outline, ear,
+-- outline) and four the other (the cheek), and because three cases have to
+-- sit side by side without touching.
+--
+-- Row 11 is the brim line and holds all three.  Under it, row 12 is what
+-- tells them apart:
+--
+--   x=4   ear out to the left -- K S K at x=3,2,1 -- and cheek running
+--         right: a sideburn, and the only pixel here that becomes skin.
+--   x=8   cheek running left, but no ear either way.  That is the profile
+--         frames' hairline above the eye, and it stays black.
+--   x=12  an ear out to the right, but no cheek behind it.  Also black.
+--
+-- The last two are what keep the rule honest: drop either half of it and
+-- one of them turns to flesh.
+local SIDEBURN = {
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 0
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 1
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 2
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 3
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 4
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 5
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 6
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 7
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 8
+  { K, K, K, O, O, O, O, O, O, O, O, O, O, O, O, K },   -- 9  the cap
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 10 its bottom edge
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 11 the brim line
+  { K, K, S, K, S, S, S, S, S, K, K, K, S, K, S, K },   -- 12 ears and cheeks
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 13
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 14
+  { K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K },   -- 15
+}
+
+io.write("transforms.lua -- the sideburn\n")
+do
+  local ctx = fakeCtx({ ["sprites/red.png"] = SIDEBURN })
+  chunk(MOD .. "transforms.lua")(ctx)
+  local px = ctx.written["green/sprites/red.png"]
+  px = px and px.out
+  ok(px ~= nil, "the per-pixel path ran")
+  eq(px and hex(px[12][5]), "f0a363",
+    "the sideburn is skin: cap above, cheek below, an ear beside it")
+  eq(px and hex(px[12][9]), "000000",
+    "a hairline with a cheek but no ear stays black")
+  eq(px and hex(px[12][13]), "000000",
+    "an ear with no cheek behind it stays black")
+  eq(px and hex(px[13][3]), "f0a363", "the ear itself is untouched")
+  eq(px and hex(px[10][5]), "65ba3f", "and the cap is still the cap")
+
+  -- nothing else in the sheet moved: exactly one pixel of ink became skin
+  local painted = 0
+  for y = 1, #SIDEBURN do
+    for x = 1, #SIDEBURN[1] do
+      if SIDEBURN[y][x] == K and hex(px[y][x]) == "f0a363" then
+        painted = painted + 1
+      end
+    end
+  end
+  eq(painted, 1, "...and it is the only black pixel in the sheet that moved")
+end
+
 io.write("transforms.lua -- the mouth and the bill\n")
 do
   local ctx = fakeCtx({ ["sprites/red.png"] = FACE })

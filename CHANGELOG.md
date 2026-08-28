@@ -2,6 +2,30 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.20.0] - 2026-08-28
+
+### Fixed
+
+- **The hair stopped flickering.** Walking towards the camera, two pixels at
+  the outer ends of the row under the cap's brim — the tips of the hair
+  between the cap and the ear — flashed black every other frame. Vanilla
+  draws them skin in one forward walk frame and ink in the other; on the grey
+  art that is a light pixel and a black one against a grey cap and reads as
+  shading, but with flesh at shade 2 and a green cap at shade 3 the same two
+  pixels swing between orange and black.
+
+  They are held to skin in both frames now. Nothing is darkened — the frame
+  that already draws them is untouched, and only the frame that draws them
+  ink is repainted.
+
+  Eleven conditions, because a looser test also finds the hairline above the
+  eye in the profile frames, which is hair and must stay black. What is only
+  true of the sideburn is the ear: on the row below, outward, an outline
+  pixel, one pixel of skin, then outline again — with the cheek running the
+  other way, which is what says this is the head's outer edge. The test sheet
+  carries a hairline with a cheek and no ear, and an ear with no cheek behind
+  it; drop either half of the rule and one of them turns to flesh.
+
 ## [1.19.0] - 2026-08-28
 
 ### Changed
