@@ -71,8 +71,10 @@ own ledger stays "None currently"; these are this mod's divergences.
   its upper half, and the hands are small patches of shade 3 reaching past
   the shirt's edge at hip height and ringed by outline. The cap's shading,
   the jacket's shoulder and sleeves, the collar and the shirt's hem each fail
-  one of those and stay green. No face found and nothing is painted at all —
-  the battle back pic is that case. Under `ADVANCED` the title
+  one of those and stay green. No face found and nothing is painted at all.
+  The battle back pic is that case, and is painted from a table of its own
+  instead: there is no face on the back of his head, and the back of his hand
+  is drawn in the paper shade, which no rule here touches. Under `ADVANCED` the title
   screen's standing figure is drawn from the recipe's own copy of that
   picture, so he gets the same face, ear and hands; in every other mode his
   rectangle is painted by shade and `MEWMON` colours him flat.

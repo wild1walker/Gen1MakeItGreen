@@ -498,8 +498,8 @@ return function(ctx)
   -- being painted somewhere it should not be.  ENTRIES_MIN is how much of it
   -- has to match before it is believed at all.
   local TITLE_PIC = "title/player.png"
-  local TITLE_MIN = 0.9
-  local TITLE_TONE = { WILD_GREEN[2], SKIN_DARK, { 0x00, 0x00, 0x00 } }
+  local TABLE_MIN = 0.9
+  local TABLE_TONE = { WILD_GREEN[2], SKIN_DARK, { 0x00, 0x00, 0x00 } }
   local TITLE_TABLE =
     "13.22.3.2 13.23.2.1 13.26.3.2 13.27.3.2 13.30.3.2 14.18.3.2 "
     .. "14.21.2.1 14.22.2.1 14.23.2.1 14.26.2.1 14.29.2.1 15.18.2.1 "
@@ -518,6 +518,48 @@ return function(ctx)
     .. "33.33.2.2 33.34.2.2 33.35.1.1 34.34.2.2 38.34.1.1 39.34.1.1 "
     .. "39.37.1.1 40.36.1.1 40.37.1.1 "
 
+  -- ------- battle/redb.png, which is painted for the same reason
+  --
+  -- The battle BACK pic had no skin on it at all: he was one green shape
+  -- from the cap to the boots, which is what "the battle sprites are still
+  -- all green" was looking at.  It is not that a rule got it wrong -- no
+  -- rule ever reached it.  `skinMask` is built around finding a FACE and
+  -- returns nothing the moment it cannot, and every rule it has after that
+  -- -- the ear, the hands, the glint, the temple -- is placed relative to
+  -- the face's own bounds.  On the back of his head there is no face, so
+  -- the picture fell through to the plain ramp and stayed there.  The
+  -- greenskin/ copy came out identical to the green/ one, which is why
+  -- PORTRAIT SKIN appeared to do nothing on it.
+  --
+  -- What is actually skin on it is two pieces: the NECK and jaw below the
+  -- cap, and the HAND and forearm at his lower right.
+  --
+  -- This one gets a table rather than a rule, and it is the same argument
+  -- the title figure makes above.  Of its 33 skin pixels ELEVEN come from
+  -- the PAPER shade -- the back of the hand is drawn in white -- and no
+  -- rule in this file touches white.  A white patch is not distinguishable
+  -- from the ground by shade, only by what surrounds it, and there is
+  -- exactly one sprite in the game shaped like this: it is a single fixed
+  -- 32x32 picture, not a sheet of frames a rule has to generalise over.
+  -- Inventing a rule to fit one sprite is, as the title figure puts it, a
+  -- drawing with extra steps.
+  --
+  -- The same guard makes it safe: every entry names the shade it was
+  -- authored against, so a cache holding a different back pic fails the
+  -- checks, `tableMask` returns nil, and the picture comes out exactly as
+  -- it does today rather than skin-toned in the wrong places.  It carries
+  -- no pixels of the vanilla art -- 33 coordinates out of 489 drawn ones,
+  -- and what they carry is where his neck and his hand are.
+  local BACK_PICS = { ["battle/redb.png"] = true,
+                      ["battle/back/redb.png"] = true }
+  local BACK_TABLE =
+    "9.17.3.2 9.18.3.2 10.18.2.1 11.16.2.1 12.16.2.1 12.20.3.2 "
+    .. "13.15.3.2 13.17.2.1 14.13.3.2 14.14.2.1 14.15.2.1 14.16.2.1 "
+    .. "14.17.2.1 14.18.2.1 15.10.3.2 15.11.3.2 15.12.3.2 15.15.3.2 "
+    .. "15.16.3.2 15.18.3.2 19.25.3.2 20.23.1.2 20.24.1.1 20.25.1.1 "
+    .. "21.23.1.1 21.24.1.1 21.25.1.1 22.24.1.1 22.25.1.1 22.26.1.1 "
+    .. "22.27.3.2 23.25.1.1 23.26.1.1 "
+
   -- The engine lifts an 8x8 POKE BALL out of this file at (0,16) and draws
   -- it on its own, at a y of its own that moves while the title animates
   -- (TitleState: newQuad(0, 16, 8, 8), drawn at 82, self.ballY).  It is a
@@ -535,19 +577,23 @@ return function(ctx)
   }
   local BALL_X, BALL_Y, BALL_W, BALL_H = 0, 16, 8, 8
 
-  -- -> a mask of tones for the one picture that has a table, or nil
-  local function titleMask(shade, w, h)
+  -- -> a mask of tones for a picture that carries a table, or nil
+  --
+  -- Two pictures do.  The guard is the same for both: every entry has to
+  -- find the shade it was authored against, and TABLE_MIN is how much of a
+  -- table has to match before any of it is believed.
+  local function tableMask(spec, shade, w, h)
     local mask, found, total = {}, 0, 0
-    for row, col, want, tone in TITLE_TABLE:gmatch("(%d+)%.(%d+)%.(%d+)%.(%d+)") do
+    for row, col, want, tone in spec:gmatch("(%d+)%.(%d+)%.(%d+)%.(%d+)") do
       row, col, want, tone = tonumber(row), tonumber(col), tonumber(want), tonumber(tone)
       total = total + 1
       if row < h and col < w and shade[row][col] == want then
         found = found + 1
         mask[row] = mask[row] or {}
-        mask[row][col] = TITLE_TONE[tone]
+        mask[row][col] = TABLE_TONE[tone]
       end
     end
-    if total == 0 or found / total < TITLE_MIN then return nil end
+    if total == 0 or found / total < TABLE_MIN then return nil end
     return mask
   end
 
@@ -629,7 +675,11 @@ return function(ctx)
     -- that leaves the picture monochrome
     local skin, detail, painted
     if (not field) and wantSkin then
-      if rel == TITLE_PIC then painted = titleMask(shade, w, h) end
+      if rel == TITLE_PIC then
+        painted = tableMask(TITLE_TABLE, shade, w, h)
+      elseif BACK_PICS[rel] then
+        painted = tableMask(BACK_TABLE, shade, w, h)
+      end
       if not painted then skin, detail = skinMask(shade, w, h) end
     end
     local ball = rel == TITLE_PIC
