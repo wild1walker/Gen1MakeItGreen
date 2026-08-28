@@ -1001,6 +1001,37 @@ do
   eq(hex(t3.player.data.out[1][3]), "65ba3f", "...and it is still green")
 end
 
+io.write("main.lua -- a derived copy that arrives late is still picked up\n")
+do
+  -- The recipe's copy is a file, and on the first boot after an install it
+  -- can arrive after this screen does.  Settling for the flat bake for the
+  -- life of the screen is what would make a fresh install show a faceless
+  -- green figure until the next launch.
+  local have = {}
+  local screen = titleScreen({ player = "green", ribbon = true }, "redpp", nil, have)
+  local title = { player = screen.raw,
+                  playerPath = "assets/generated/title/player.png" }
+
+  screen.TitleState.currentSprite(title)
+  eq(inner_kind(title.player), "baked",
+    "with no file there yet, the flat bake carries the screen")
+
+  -- the transform finishes and the file appears
+  have["assets/generated/greenskin/title/player.png"] = true
+  local found = false
+  for _ = 1, 200 do
+    screen.TitleState.currentSprite(title)
+    if inner_kind(title.player) == "derived" then found = true break end
+  end
+  ok(found, "...and the copy is picked up once it is there")
+  eq(inner_kind(title.player), "derived", "the figure is the recipe's copy")
+
+  -- and once it has it, it stops asking
+  local asked = #screen.asked
+  for _ = 1, 50 do screen.TitleState.currentSprite(title) end
+  eq(#screen.asked, asked, "no more file loads once the copy is in hand")
+end
+
 io.write("main.lua -- the figure is asserted before the draw reads it\n")
 do
   -- TitleState:draw captures self.player at the top and calls currentSprite

@@ -2,6 +2,27 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.16.0] - 2026-08-28
+
+### Fixed
+
+- **The first launch after an install no longer settles for the flat bake.**
+  The recipe's copy of the title figure is a file, the transform writes it at
+  install time, and the title screen is one of the earliest things drawn — so
+  on a fresh install the copy can arrive a moment after the screen does. The
+  draw took that as final and kept the faceless green bake for the life of
+  the screen, which is what "works after a relaunch, not before" looked like.
+
+  It asks again now while it hasn't got the copy — once every 45 draws, so a
+  miss costs one file load a second rather than one a frame — and stops the
+  moment it has it.
+
+### Notes
+
+- A new *version* still needs a relaunch to load at all: mods are loaded once
+  at boot, so installing over a running game leaves the previous one running.
+  That is the engine's, not this mod's, and both docs now say which is which.
+
 ## [1.15.0] - 2026-08-28
 
 ### Fixed

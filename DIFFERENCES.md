@@ -84,12 +84,13 @@ own ledger stays "None currently"; these are this mod's divergences.
   reads grey art through. The mono and inverted display modes do not honour
   `trueColor` (`PaletteFX.honorsTrueColor`), so there the player falls back
   to the baked ramp like any other sprite.
-- **Updating the mod takes effect on the next launch.** The recoloured
-  pictures are written once, when the transform runs, and the engine caches
-  each image by its resolved path for the session (`Assets.image`). Install a
-  new version over a running game and both the derived files and the images
-  already loaded from them are the old ones until you relaunch — the title
-  figure especially, since it is loaded once when that screen is entered.
+- **A new version takes effect on the next launch.** Mods are loaded once,
+  at boot, so a version installed over a running game leaves the previous one
+  running until you restart. On the launch after that everything is current:
+  the title draw keeps asking for the recipe's copy of the figure while it
+  hasn't got one, rather than settling on the flat bake, because the
+  transform writes its pictures at install time and that screen is drawn very
+  early.
 
 - **`PLAYER` takes effect on the next launch** for the overworld walker,
   which is a `sprites` record and settled at load. The battle and card pics

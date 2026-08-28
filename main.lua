@@ -491,27 +491,46 @@ return function(mod)
       return raw
     end
 
+    -- ------- and keep asking for the derived copy
+    --
+    -- The recipe's copy is a FILE, and on the first boot after an install it
+    -- can arrive a moment after this screen does -- the transform writes it,
+    -- and the title is one of the earliest things drawn.  Settling for the
+    -- flat bake for the life of the screen is what makes a fresh install
+    -- show a faceless green figure until the next launch.  So while we are
+    -- on the fallback, ask again: rarely, because each ask is a file load,
+    -- and never once we have it.
+    local RETRY = 45
+
     local function apply(title, mark)
       if PaletteFX.mode == "redpp" then
-        if title.__wildGreenBaked == nil then
-          -- the recipe's copy first: it is the whole figure, skin and all.
-          -- The bake is the fallback, and it is flat green -- it works off
-          -- the shade buckets alone and knows nothing about where a face is.
-          local how = "the recipe's green copy"
-          title.__wildGreenBaked = derived(title)
-          if not title.__wildGreenBaked then
-            local raw = rawOf(title)
-            if not raw then return end          -- nothing to work from yet
-            how = "a flat bake -- no derived copy of " ..
-              tostring(title.playerPath)
-            title.__wildGreenBaked = greenBake(raw) or false
+        if not title.__wildGreenHasCopy then
+          local wait = title.__wildGreenWait
+          if title.__wildGreenBaked == nil or not wait or wait <= 0 then
+            local found = derived(title)
+            if found then
+              title.__wildGreenHasCopy = true
+              title.__wildGreenBaked = found
+              mod.log:info("title figure: the recipe's green copy")
+            else
+              title.__wildGreenWait = RETRY
+              if title.__wildGreenBaked == nil then
+                -- the bake is flat green: it works off the shade buckets
+                -- alone and knows nothing about where a face is
+                local raw = rawOf(title)
+                if not raw then return end      -- nothing to work from yet
+                title.__wildGreenBaked = greenBake(raw) or false
+                -- the line 1.4.0 needed: the wrap succeeded there and the
+                -- BAKE was what failed, silently, a frame later
+                mod.log:info("title figure: %s", title.__wildGreenBaked
+                  and ("a flat bake for now -- still looking for a derived "
+                       .. "copy of " .. tostring(title.playerPath))
+                  or "could not read the art, left as it was")
+              end
+            end
+          else
+            title.__wildGreenWait = wait - 1
           end
-          -- once per visit to that screen, and the line 1.4.0 needed: the
-          -- wrap succeeded there and the BAKE was what failed, silently, a
-          -- frame later.  "wrapped" was true and the figure was still red.
-          mod.log:info("title figure: %s", title.__wildGreenBaked
-            and how
-            or "could not read the art, left as it was")
         end
         local baked = title.__wildGreenBaked
         if not baked then return end
@@ -538,6 +557,8 @@ return function(mod)
           title.player = raw
         end
         title.__wildGreenBaked = nil
+        title.__wildGreenHasCopy = nil
+        title.__wildGreenWait = nil
         title.__crystalTrainerBaked = nil
       end
     end

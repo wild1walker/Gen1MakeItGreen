@@ -81,10 +81,16 @@ WILD GREEN
   it follows `PLAYER`: switch the character back to red and the names go
   back with him.
 
-**Relaunch after updating.** The recoloured pictures are written once, when
-the transform runs, and the engine caches each image by its resolved path
-for the session. A version installed over a running game shows the old
-pictures until the next launch.
+**A new version needs a relaunch to load at all** — mods are loaded once, at
+boot, so installing over a running game leaves the old code running until
+you restart. That part is the engine's, not this mod's.
+
+What *is* this mod's is the first launch after that. The transform writes
+its pictures at install time and the title screen is one of the earliest
+things drawn, so the recipe's copy of the figure can arrive a moment after
+the screen does. The title draw keeps asking for it — rarely, and only while
+it hasn't got it — rather than settling on the flat bake for the life of the
+screen. So the first load shows the drawn figure, not a faceless one.
 
 ## No green pixel ships
 
