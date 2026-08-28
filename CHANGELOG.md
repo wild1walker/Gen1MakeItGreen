@@ -2,6 +2,42 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.4.0] - 2026-08-28
+
+### Fixed
+
+- **The title screen's standing figure is green under `ADVANCED`.** He had
+  stayed red there through every release, and not because of anything the
+  palette or the art was doing. `ADVANCED` (`PaletteFX.mode` `redpp`) does
+  not run the SGB zone pass over his rectangle, so the `MEWMON` override
+  1.1.2 added never reached him — and [Crystal Animated Sprites][crystal],
+  which the Wild Green cart pins, marks that rectangle true-colour there and
+  luminance-bakes his grey art to Red's own white / skin / red / navy so he
+  is not left raw grey. That bake is downstream of every seam this mod had.
+
+  So it now does the same bake in its own four. It wraps
+  `TitleState.currentSprite` from outside (priority 1300, loaded last),
+  captures the untouched grey art on the way in — before the red bake — and
+  paints it white / light green / green / black on the way out, the trainer
+  card's ramp. Out of `ADVANCED` it hands the grey art back and `MEWMON` has
+  him again, exactly as before.
+
+  This also corrects 1.1.1's note, which is wrong. The white-and-pink figure
+  1.1.0 put on screen was that same red bake reading *this mod's* green art —
+  the outfit green and the light green both land in its skin bucket — not the
+  engine's shade buckets. Swapping the pic was never going to work in that
+  mode; running after the bake is what does.
+
+### Changed
+
+- The mod declares one permission, `engine_internals`, and uses it for
+  `src.ui.TitleState` and `src.render.PaletteFX` and nothing else. Every step
+  of the bake is guarded: without the modules, without `love.graphics`,
+  without a clonable `ImageData`, the figure is what it was and the rest of
+  the mod is untouched.
+
+[crystal]: https://github.com/distilledorion-sketch/crystal_animated_sprites_with_shiny_visuals
+
 ## [1.3.0] - unreleased
 
 ### Changed

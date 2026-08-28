@@ -29,6 +29,10 @@
 --                      schema does not expose.
 --   palettes MEWMON    the title screen's standing figure, which has no
 --                      per-image seam and is coloured by its zone palette.
+--   TitleState         the same figure under REDPP, where the zone pass does
+--                      not reach him and another mod paints him red after
+--                      everything this one can say.  The only engine
+--                      internal here, and the reason for the permission.
 --   field.boot         playerName, so the game offers GREEN where it used to
 --                      offer RED.
 --   palettes LOGO1     the SGB palette the title's ribbon band wears.
@@ -50,6 +54,17 @@ return function(mod)
   local WILD_GREEN = {
     { 0xff, 0xff, 0xff },
     { 0xf0, 0xa3, 0x63 },
+    { 0x65, 0xba, 0x3f },
+    { 0x00, 0x00, 0x00 },
+  }
+
+  -- The trainer art's four, which is what the title figure is baked to as
+  -- well: monochrome green, because shade 2 on a portrait is the LIGHT for
+  -- everything rather than the face.  transforms.lua explains it at length.
+  -- Another copy tools/check.py keeps honest.
+  local WILD_GREEN_PIC = {
+    { 0xff, 0xff, 0xff },
+    { 0xa8, 0xdd, 0x8a },
     { 0x65, 0xba, 0x3f },
     { 0x00, 0x00, 0x00 },
   }
@@ -247,11 +262,11 @@ return function(mod)
 
   -- ------- the title screen's standing figure
   --
-  -- Not by swapping the pic.  TitleState bakes the OBJ palette onto it and
-  -- cuts its rectangle OUT of the true-colour region on purpose, so the mon
-  -- cycling behind it keeps its palette -- there is no trueColor seam, and
-  -- 1.1.0 proved it: recoloured art handed to that draw came back through
-  -- the shade buckets as a white-and-pink figure.
+  -- Not by swapping the pic.  The figure's rectangle is cut OUT of the
+  -- true-colour region on purpose, so the mon cycling behind it keeps its
+  -- palette, and what is left is painted by the SGB zone pass -- which
+  -- reads the art's shade and not its colour.  Recoloured art handed to
+  -- that draw comes back as whatever the zone palette says.
   --
   -- So the figure keeps the vanilla grey art and MEWMON is what colours it.
   -- MEWMON is the zone palette for tile rows 10-17, which is the figure, the
@@ -269,9 +284,146 @@ return function(mod)
   -- Like LOGO1 below, this is a registry record only under SGB: OG RED
   -- short-circuits every named palette to the boot-ROM pair and ADVANCED
   -- reads data/palettes_gbc.
+  -- ------- ...and the same figure under REDPP, where MEWMON cannot reach him
+  --
+  -- ADVANCED (PaletteFX.mode "redpp") does not run the zone pass over that
+  -- rectangle at all, and this cart is the reason.  Crystal Animated
+  -- Sprites -- pinned here -- marks the trainer's rect true-colour under
+  -- REDPP so the zone pass cannot smear MEWMON over the vivid mon behind
+  -- him, and then luminance-bakes his grey art to Red's own white / skin /
+  -- red / navy so he is not left raw grey.  That bake is the whole of "the
+  -- main screen didn't change": the figure is red because another mod
+  -- paints him red, downstream of everything this one can say.
+  --
+  -- It is also what 1.1.0 actually was.  The white-and-pink figure that
+  -- release put on screen was that same bake reading OUR green art -- the
+  -- outfit green and the light green both land in its skin bucket -- not
+  -- the engine's shade buckets, which is what 1.1.1's note said and got
+  -- wrong.  Swapping the pic was never going to work; running after the
+  -- bake is.
+  --
+  -- So: the same bake in this mod's four.  It wraps TitleState.currentSprite
+  -- from OUTSIDE (this mod is priority 1300 and loads last, so its wrapper
+  -- goes on over theirs), captures the untouched art on the way in -- before
+  -- the red bake happens -- and paints that on the way out.  Out of REDPP it
+  -- hands the grey art back and MEWMON has him again.
+  --
+  -- Every step is pcall'd and every miss is a no-op: without the engine
+  -- module, without love.graphics, without a clonable ImageData, the figure
+  -- is exactly what it was before this block existed.
+  local function shadeOf(r)
+    -- the recipe's own four thresholds.  The red channel rather than a
+    -- weighted luminance, so art that is already green -- if something got
+    -- there first -- buckets by its shade instead of collapsing into one.
+    if r > 0.83 then return 1 end
+    if r > 0.5 then return 2 end
+    if r > 0.17 then return 3 end
+    return 4
+  end
+
+  -- A PRIVATE copy, recoloured.  Never the shared ImageData in place: the
+  -- title art is cached and other draws read the same object.
+  local function greenBake(raw)
+    local okData, data = pcall(raw.getData, raw)
+    if not (okData and data) then return nil end
+    local okClone, copy = pcall(data.clone, data)
+    if not (okClone and copy) then return nil end
+    local okMap = pcall(function()
+      copy:mapPixel(function(_, _, r, g, b, a)
+        if a == 0 then return r, g, b, a end
+        local colour = WILD_GREEN_PIC[shadeOf(r)]
+        return colour[1] / 255, colour[2] / 255, colour[3] / 255, a
+      end)
+    end)
+    if not okMap then return nil end
+    local okNew, image = pcall(love.graphics.newImage, copy)
+    if not (okNew and image) then return nil end
+    pcall(image.setFilter, image, "nearest", "nearest")
+    return image
+  end
+
+  local function wrapTitleFigure()
+    if type(love) ~= "table" or type(love.graphics) ~= "table" then
+      return "no love.graphics"
+    end
+    local okTitle, TitleState = pcall(require, "src.ui.TitleState")
+    if not okTitle or type(TitleState) ~= "table"
+        or type(TitleState.currentSprite) ~= "function" then
+      return "no TitleState.currentSprite"
+    end
+    if TitleState.__wildGreenFigure then return "already wrapped" end
+    local okFX, PaletteFX = pcall(require, "src.render.PaletteFX")
+    if not okFX or type(PaletteFX) ~= "table" then return "no PaletteFX" end
+
+    -- Where the strip is drawn.  Not derivable from here: it is the rect
+    -- Crystal marks true-colour for the same image on the same screen, and
+    -- it is marked again rather than conditionally, because the mark has to
+    -- happen whether or not that mod is installed and marking the same rect
+    -- twice costs nothing.
+    local FIGURE_X, FIGURE_Y = 82, 80
+
+    local function apply(title)
+      local raw = title.__wildGreenRaw
+      if not raw then
+        -- the art was not there on the way in, which happens if the screen
+        -- loads it inside currentSprite.  Crystal captured the same
+        -- untouched picture before baking over it; take that rather than
+        -- the bake that is on screen now.
+        raw = title.__crystalPlayerRaw
+        if not raw then return end
+        title.__wildGreenRaw = raw
+      end
+      if PaletteFX.mode == "redpp" then
+        if title.__wildGreenBaked == nil then
+          title.__wildGreenBaked = greenBake(raw) or false
+        end
+        local baked = title.__wildGreenBaked
+        if not baked then return end
+        title.player = baked
+        -- Crystal re-bakes on every call until its own flag is set; with it
+        -- set its bake returns early and leaves ours standing.  Its restore
+        -- path -- a switch out of REDPP -- then puts back the same picture
+        -- we captured, which is where the branch below leaves it too, so the
+        -- two agree about the figure in both directions.
+        title.__crystalPlayerRaw = title.__crystalPlayerRaw or raw
+        title.__crystalTrainerBaked = true
+        if type(PaletteFX.markTrueColor) == "function" then
+          local okDim, w, h = pcall(baked.getDimensions, baked)
+          if okDim and w and h then
+            pcall(PaletteFX.markTrueColor, FIGURE_X, FIGURE_Y, w, h)
+          end
+        end
+      elseif title.__wildGreenBaked then
+        -- out of REDPP the zone pass runs again and MEWMON is what colours
+        -- him, so the grey art goes back: baked green through the zone pass
+        -- would be painted twice.
+        if title.player == title.__wildGreenBaked then title.player = raw end
+        title.__wildGreenBaked = nil
+        title.__crystalTrainerBaked = nil
+      end
+    end
+
+    TitleState.__wildGreenFigure = true
+    local inner = TitleState.currentSprite
+    function TitleState:currentSprite(...)
+      -- captured on the way IN, which is the only moment the art is still
+      -- the grey the importer wrote
+      if self.player and not self.__wildGreenRaw then
+        self.__wildGreenRaw = self.player
+      end
+      local image, trueColor = inner(self, ...)
+      pcall(apply, self)
+      return image, trueColor
+    end
+    return "wrapped"
+  end
+
   if green and option("title_figure", true) then
     try("palettes.MEWMON", function()
       mod.content.palettes:override("MEWMON", WILD_GREEN)
+    end)
+    try("title.figure", function()
+      mod.log:info("title figure under REDPP: %s", tostring(wrapTitleFigure()))
     end)
   end
 

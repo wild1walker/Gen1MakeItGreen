@@ -6,9 +6,13 @@
 Three copies of the Wild Green palette exist in this tree, and they have to
 agree:
 
-    tools/palette.py    RAMP and TITLE_RAMP, and what the label is drawn from
-    transforms.lua      WILD_GREEN, what the player's art is recolored to
-    main.lua            WILD_GREEN_TITLE, what LOGO1 is overridden with
+    tools/palette.py    RAMP, PIC_RAMP and TITLE_RAMP, and what the label
+                        is drawn from
+    transforms.lua      WILD_GREEN and WILD_GREEN_PIC, what the player's art
+                        is recolored to
+    main.lua            WILD_GREEN, what MEWMON is overridden with;
+                        WILD_GREEN_PIC, what the title figure is baked to;
+                        WILD_GREEN_TITLE, what LOGO1 is overridden with
 
 The character ramp and the title ramp are different on purpose: the character
 is a sprite whose second shade is skin, and the ribbon is lettering on white.
@@ -43,6 +47,7 @@ RAMPS = (
     ("transforms.lua", "local WILD_GREEN =", RAMP),
     ("transforms.lua", "local WILD_GREEN_PIC", PIC_RAMP),
     ("main.lua", "local WILD_GREEN =", RAMP),
+    ("main.lua", "local WILD_GREEN_PIC", PIC_RAMP),
     ("main.lua", "local WILD_GREEN_TITLE", TITLE_RAMP),
 )
 RIBBON = ROOT / "assets" / "title" / "wild_green_version.png"

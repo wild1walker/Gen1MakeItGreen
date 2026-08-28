@@ -29,10 +29,21 @@ own ledger stays "None currently"; these are this mod's divergences.
   affected: opponent portraits, the animated battle sprites and the shiny
   reveal all go through other seams.
 
-- **The title screen's standing figure stays vanilla.** `TitleState` bakes
-  the OBJ palette onto it and cuts its rectangle out of the true-colour
-  region so the cycling mon keeps its palette, so there is no seam to hand it
-  recoloured art through. The ribbon carries that screen instead.
+- **The title screen's standing figure is coloured, never swapped.** His
+  rectangle is cut out of the true-colour region so the cycling mon keeps its
+  palette, and what is left is painted by shade — so recoloured art handed to
+  that draw is thrown away. `MEWMON` colours him in every mode that runs the
+  zone pass, and `TITLE FIGURE` switches that off.
+
+- **Under `ADVANCED` he is baked, not palettised, and that is Crystal
+  Animated Sprites' rectangle.** That mode does not run the zone pass over
+  him, and the pinned mod marks his rectangle true-colour there and bakes his
+  grey art to Red's own white / skin / red / navy. This mod wraps
+  `TitleState.currentSprite` outside that wrapper — it is priority 1300 and
+  loads last — and re-bakes from the grey art it captured on the way in, in
+  the trainer card's white / light green / green / black. Turn Crystal
+  Animated Sprites off and `ADVANCED` still gets the green bake; turn
+  `TITLE FIGURE` off and neither happens.
 
 - **The green band is a registry record only under SGB.** `PaletteFX.pal`
   (`src/render/PaletteFX.lua`) short-circuits every named palette to the
@@ -58,8 +69,10 @@ own ledger stays "None currently"; these are this mod's divergences.
 ## Not changed
 
 No map, script, encounter, trainer, item, move or battle behaviour. Nothing
-here is read by anything but the renderer, and the mod declares no
-`permissions` at all.
+here is read by anything but the renderer. The mod declares one permission,
+`engine_internals`, and uses it for exactly one thing: `src.ui.TitleState`
+and `src.render.PaletteFX`, to bake the title figure green under `ADVANCED`.
+Nothing else in the mod touches an engine module.
 
 ## Save data
 

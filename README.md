@@ -21,7 +21,7 @@ It works on its own too. Nothing here depends on either bundle.
 | the front pic | Oak's intro, the trainer card, the Hall of Fame | the `player.sprite` hook |
 | the credits and intro pics | where the import wrote them | the `player.sprite` hook |
 | the title screen | the version ribbon | `field.boot.title` |
-| the title figure | the standing player on that screen | the `MEWMON` palette |
+| the title figure | the standing player on that screen | the `MEWMON` palette, and a bake of its own under `ADVANCED` |
 | the default name | `GREEN` where the game offered `RED` | `field.boot.playerName` |
 
 The two battle pics go through the **hook** rather than a registry write, and
@@ -58,9 +58,12 @@ WILD GREEN
   Off gives back the imported ribbon and the imported band colour. On, the
   title says `WILD GREEN VERSION` whichever colour the character is —
   that is the game's name, not the character's outfit.
-- **`TITLE FIGURE`** colours the standing player on the title screen, and
-  takes the `GAME FREAK` line with it — see below for why the two cannot be
-  separated. Off gives that screen back to the base game.
+- **`TITLE FIGURE`** colours the standing player on the title screen. In
+  most display modes that is the `MEWMON` zone palette, which takes the
+  `GAME FREAK` line with it — see below for why the two cannot be separated.
+  Under `ADVANCED` the zone pass does not reach him at all and he is baked
+  instead, so there the copyright line is untouched. Off gives that screen
+  back to the base game either way.
 - **`DEFAULT NAME GREEN`** is the name offered before you type one. It has a
   row of its own because it is the one thing here that ends up written into
   a save, and it follows `PLAYER`: switch the character back to red and the
@@ -139,12 +142,11 @@ the ramp.
 
 ### The title figure is coloured, not recoloured
 
-`TitleState` bakes the OBJ palette onto that pic and gives it no `trueColor`
-path — `markVisibleTrueColor` cuts the player's rectangle *out* of the
-true-colour region on purpose, so the mon cycling behind him keeps its
-palette. Art handed to that draw comes back through the shade buckets: the
-tan reads as white and the green as whatever colour index 3 happens to be,
-which in the field was pink.
+`markVisibleTrueColor` cuts the player's rectangle *out* of the true-colour
+region on purpose, so the mon cycling behind him keeps its palette. What is
+left is painted **by shade**, and the colour a file carries is thrown away
+before it reaches the screen. Handing that draw recoloured art does nothing;
+it has to be coloured at the other end.
 
 So the figure keeps the vanilla grey art and **`MEWMON`**, its zone palette,
 is overridden instead. That zone is tile rows 10–17, which is not free:
@@ -155,6 +157,31 @@ is overridden instead. That zone is tile rows 10–17, which is not free:
   palette reaches one and not the other. That holds with any sprite mod on,
   including the one the cart pins. Switch them all off and the title mon
   goes green too, which is what the `TITLE FIGURE` row is for.
+
+### …except under `ADVANCED`, where he is baked
+
+`ADVANCED` (`PaletteFX.mode` `redpp`) does not run the zone pass over that
+rectangle, so `MEWMON` never reaches him — and the cart's own
+[Crystal Animated Sprites][crystal] marks the rectangle true-colour there
+and luminance-bakes his grey art to Red's white / skin / red / navy, so he
+is not left raw grey. That bake is downstream of every seam this mod has,
+which is why the figure stayed red on that screen through 1.3.0 no matter
+what was done to the art or the palette.
+
+1.4.0 does the same bake in this mod's four. It wraps
+`TitleState.currentSprite` from *outside* — this mod is priority 1300 and
+loads last, so its wrapper goes on over theirs — captures the untouched grey
+art on the way in, before the red bake happens, and paints that green on the
+way out, in the same white / light green / green / black the trainer card
+uses. Out of `ADVANCED` it hands the grey art back and `MEWMON` has him
+again.
+
+It is the mod's one engine internal, and the reason it declares
+`engine_internals`. Every step of it is guarded: without the module, without
+`love.graphics`, without a clonable `ImageData`, the figure is exactly what
+it was before, and nothing else in the mod is affected.
+
+[crystal]: https://github.com/distilledorion-sketch/crystal_animated_sprites_with_shiny_visuals
 
 ### The mouth is not clothing, and the bill is not skin
 

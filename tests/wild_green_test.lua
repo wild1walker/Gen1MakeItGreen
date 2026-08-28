@@ -232,9 +232,10 @@ do
                          "battle/redb.png", "trainer_card/red.png" }) do
     ok(wrote["green/" .. rel], "green/" .. rel .. " written")
   end
-  -- TitleState bakes the OBJ palette onto the title figure and gives it no
-  -- trueColor path, so recoloured art handed to that draw comes back through
-  -- the shade buckets -- white and pink, in the field.  It is not recoloured.
+  -- The title figure is painted by shade, not by colour -- the zone pass in
+  -- most modes, another mod's luminance bake under REDPP -- so a recoloured
+  -- file for him is thrown away before it reaches the screen.  He is
+  -- coloured at the other end instead; see the REDPP section below.
   ok(not wrote["green/title/player.png"],
     "the title screen's standing figure is not recoloured")
   ok(not wrote["green/battle/oldmanb.png"],
@@ -401,7 +402,7 @@ do
   local boot = mod.content.field.patches.boot
   ok(boot and boot.title, "field.boot.title is patched")
   ok(boot and boot.title and boot.title.player == nil,
-    "the title's standing figure is left vanilla -- it has no trueColor seam")
+    "the title's standing figure is not swapped -- it is coloured, not swapped")
   eq(boot and boot.title and boot.title.versionRibbon,
     "mods/wild_green/assets/title/wild_green_version.png",
     "the ribbon is the mod's own art")
@@ -510,6 +511,210 @@ do
   chunk(MOD .. "main.lua")(mod)
   ok(mod.content.sprites.patches.SPRITE_RED == nil,
     "a walker that is not vanilla art is not fought over")
+end
+
+-- ------- the title screen's standing figure, under REDPP
+--
+-- MEWMON colours him in every mode that runs the SGB zone pass.  ADVANCED
+-- (PaletteFX.mode "redpp") does not run it over his rectangle, and Crystal
+-- Animated Sprites -- which the cart pins -- luminance-bakes his grey art to
+-- Red's own white / skin / red / navy there so he is not left grey.  That
+-- bake is downstream of every seam this mod has, which is why the figure
+-- stayed red through 1.3.0.  main.lua wraps TitleState.currentSprite from
+-- outside it, captures the grey art on the way in and paints it green on the
+-- way out.
+--
+-- The stubs below are that screen: an ImageData that can be cloned and
+-- mapped, a love.graphics that makes an image out of one, a PaletteFX with a
+-- mode and a markTrueColor, and an inner currentSprite that bakes red first
+-- the way Crystal's does.
+
+local RED_BAKE = { { 255, 255, 255 }, { 236, 168, 120 },
+                   { 216, 64, 48 }, { 56, 64, 120 } }
+
+local function fakeImageData(rows)
+  local data = { rows = rows }
+  function data:clone()
+    local copy = { rows = self.rows }
+    copy.clone = data.clone
+    function copy:mapPixel(fn)
+      self.out = {}
+      for y = 1, #self.rows do
+        self.out[y] = {}
+        for x = 1, #self.rows[y] do
+          local v = self.rows[y][x] / 255
+          local r, g, b, a = fn(x - 1, y - 1, v, v, v, 1)
+          self.out[y][x] = { math.floor(r * 255 + .5),
+                             math.floor(g * 255 + .5),
+                             math.floor(b * 255 + .5), a }
+        end
+      end
+      return self
+    end
+    return copy
+  end
+  return data
+end
+
+local function fakeTitleImage(rows)
+  local image = { rows = rows, kind = "raw" }
+  function image:getData() return fakeImageData(self.rows) end
+  function image:getDimensions() return #self.rows[1], #self.rows end
+  function image:setFilter() end
+  return image
+end
+
+-- the whole screen: fresh modules, a fresh global love, one title instance.
+-- `lazy` is the art the inner link loads for itself, the way a screen that
+-- builds its own picture inside currentSprite would -- there is nothing to
+-- capture on the way in then, and the fallback is what has to find it.
+local function titleScreen(options, mode, lazy)
+  local marks = {}
+  local PaletteFX = {
+    mode = mode,
+    markTrueColor = function(x, y, w, h)
+      marks[#marks + 1] = { x = x, y = y, w = w, h = h }
+    end,
+  }
+  local inner = { calls = 0 }
+  local TitleState = {}
+  -- Crystal's link: under redpp it replaces the art with its own red bake
+  -- and flags it, and out of redpp it puts the untouched art back.
+  function TitleState:currentSprite()
+    inner.calls = inner.calls + 1
+    if lazy then self.player = self.player or lazy end
+    if PaletteFX.mode == "redpp" then
+      if not self.__crystalPlayerRaw then self.__crystalPlayerRaw = self.player end
+      if not self.__crystalTrainerBaked then
+        local red = { kind = "red bake" }
+        function red:getDimensions() return 16, 24 end
+        function red:setFilter() end
+        self.player = red
+        self.__crystalTrainerBaked = true
+      end
+    elseif self.__crystalTrainerBaked then
+      self.player = self.__crystalPlayerRaw
+      self.__crystalTrainerBaked = nil
+    end
+    return "the cycling mon", true
+  end
+
+  package.loaded["src.ui.TitleState"] = TitleState
+  package.loaded["src.render.PaletteFX"] = PaletteFX
+
+  -- left installed on purpose: main.lua reads the `love` global when it
+  -- bakes, which is at currentSprite time and not at load
+  local made = {}
+  _G.love = { graphics = { newImage = function(data)
+    local image = { data = data, kind = "baked" }
+    function image:getDimensions() return #self.data.rows[1], #self.data.rows end
+    function image:setFilter() end
+    made[#made + 1] = image
+    return image
+  end } }
+
+  local mod = fakeMod(options)
+  chunk(MOD .. "main.lua")(mod)
+
+  package.loaded["src.ui.TitleState"] = nil
+  package.loaded["src.render.PaletteFX"] = nil
+
+  return {
+    mod = mod, TitleState = TitleState, PaletteFX = PaletteFX,
+    marks = marks, inner = inner, made = made,
+    -- one 4x2 strip in the four grey shades the importer writes
+    raw = fakeTitleImage({ { W, S, O, K }, { W, S, O, K } }),
+  }
+end
+
+io.write("main.lua -- the title figure under REDPP\n")
+do
+  local screen = titleScreen({ player = "green", ribbon = true }, "redpp")
+  local title = { player = screen.raw }
+
+  local image, trueColor = screen.TitleState.currentSprite(title)
+  eq(image, "the cycling mon", "the inner link's return is passed through")
+  eq(trueColor, true, "...and so is its true-colour answer")
+  eq(screen.inner.calls, 1, "the inner link ran exactly once")
+
+  ok(title.player ~= nil and title.player.kind == "baked",
+    "the figure is this mod's bake, not the red one downstream of it")
+  eq(title.__wildGreenRaw, screen.raw,
+    "the grey art was captured on the way in, before the red bake")
+
+  local px = title.player.data.out
+  eq(hex(px[1][1]), "ffffff", "shade 1 is paper")
+  eq(hex(px[1][2]), "a8dd8a", "shade 2 is the light green, as on the card")
+  eq(hex(px[1][3]), "65ba3f", "shade 3 is the outfit green")
+  eq(hex(px[1][4]), "000000", "shade 4 is ink")
+
+  eq(#screen.marks, 1, "the strip is marked true-colour")
+  eq(screen.marks[1] and screen.marks[1].w, 4, "...at the baked art's width")
+  eq(screen.marks[1] and screen.marks[1].h, 2, "...and its height")
+
+  -- the flag that stops the red bake coming back a frame later
+  eq(title.__crystalTrainerBaked, true,
+    "the downstream bake is flagged done, so it does not repaint him")
+
+  local first = title.player
+  screen.TitleState.currentSprite(title)
+  eq(title.player, first, "a second frame keeps the same baked image")
+  eq(screen.inner.calls, 2, "...and still runs the inner link")
+end
+
+io.write("main.lua -- the title figure out of REDPP\n")
+do
+  -- every other mode runs the zone pass, and MEWMON is what colours him:
+  -- the grey art has to go back or he would be painted twice
+  local screen = titleScreen({ player = "green", ribbon = true }, "redpp")
+  local title = { player = screen.raw }
+  screen.TitleState.currentSprite(title)
+  ok(title.player.kind == "baked", "green under redpp")
+
+  screen.PaletteFX.mode = "sgb"
+  screen.TitleState.currentSprite(title)
+  eq(title.player, screen.raw, "the grey art is handed back for the zone pass")
+  ok(title.__crystalTrainerBaked == nil, "...and the downstream flag with it")
+  eq(#screen.marks, 1, "nothing new is marked true-colour")
+
+  screen.PaletteFX.mode = "redpp"
+  screen.TitleState.currentSprite(title)
+  ok(title.player.kind == "baked", "back into redpp and he is green again")
+end
+
+io.write("main.lua -- the title figure when the art arrives late\n")
+do
+  -- a screen that loads its own art inside currentSprite gives this nothing
+  -- to capture on the way in; Crystal's capture of the same untouched
+  -- picture is what it falls back to, never the bake that is on screen
+  local raw = fakeTitleImage({ { W, S, O, K }, { W, S, O, K } })
+  local screen = titleScreen({ player = "green", ribbon = true }, "redpp", raw)
+  local title = {}
+
+  screen.TitleState.currentSprite(title)
+  eq(title.__wildGreenRaw, raw, "the untouched art is found, not the bake")
+  ok(title.player ~= nil and title.player.kind == "baked",
+    "...and the figure is baked green from it")
+  eq(hex(title.player.data.out[1][3]), "65ba3f", "...in the outfit green")
+end
+
+io.write("main.lua -- the title figure is not always wrapped\n")
+do
+  local off = titleScreen({ player = "green", title_figure = false }, "redpp")
+  ok(off.TitleState.__wildGreenFigure == nil,
+    "TITLE FIGURE off leaves TitleState alone entirely")
+
+  local red = titleScreen({ player = "red" }, "redpp")
+  ok(red.TitleState.__wildGreenFigure == nil,
+    "PLAYER = RED leaves TitleState alone too")
+
+  -- a boot with no love and no engine modules is the headless case, and it
+  -- must cost the figure and nothing else
+  _G.love = nil
+  local mod = fakeMod({ player = "green", ribbon = true })
+  chunk(MOD .. "main.lua")(mod)
+  ok(mod.content.sprites.patches.SPRITE_RED ~= nil,
+    "with no TitleState to wrap, the rest of the mod still lands")
 end
 
 io.write(("\n%d passed, %d failed\n"):format(passed, failed))

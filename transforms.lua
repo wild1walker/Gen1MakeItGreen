@@ -99,12 +99,13 @@ return function(ctx)
   --
   -- Two absences are deliberate.  The old man's demo back pic
   -- (battle/oldmanb.png) is not the player, and the catch tutorial should
-  -- not turn green.  And the title screen's standing figure has no seam:
-  -- TitleState bakes the OBJ palette onto it and cuts its rectangle out of
-  -- the true-colour region so the mon behind it keeps its palette, so
-  -- recoloured art handed to that draw comes back through the shade buckets
-  -- -- white and pink, in the field.  main.lua colours it through MEWMON
-  -- instead.
+  -- not turn green.  And the title screen's standing figure is not swapped
+  -- either: his rectangle is cut out of the true-colour region so the mon
+  -- cycling behind him keeps its palette, and what is left is painted by
+  -- shade -- by the SGB zone pass in most modes, and by another mod's
+  -- luminance bake under REDPP.  Either way the colour a recoloured file
+  -- carries is thrown away before it reaches the screen.  main.lua colours
+  -- him through MEWMON and, under REDPP, through a bake of its own.
   --
   -- `field` picks the ramp: true takes the overworld four and the mouth and
   -- bill rules, false takes the portrait four and neither.

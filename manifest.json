@@ -1,7 +1,7 @@
 {
   "id": "wild_green",
   "name": "Wild Green",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "api": 2,
   "entry": "main.lua",
   "assets_transforms": "transforms.lua",
@@ -20,7 +20,9 @@
     "red"
   ],
   "experimental": false,
-  "permissions": [],
+  "permissions": [
+    "engine_internals"
+  ],
   "github": "wild1walker/Gen1MakeItGreen",
   "description": "The player wears green and is called GREEN, and the title screen says WILD GREEN VERSION. The character art is recolored from your own imported cache, never shipped, and PLAYER switches back to RED whenever you want it."
 }
