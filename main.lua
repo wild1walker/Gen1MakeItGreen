@@ -268,7 +268,7 @@ return function(mod)
   -- keeps -- which quietly cost the default name when this was written as
   -- two.
 
-  local bootPatch, title = {}, {}
+  local bootPatch, title, namesPatch = {}, {}, nil
 
   -- GREEN where the game used to offer RED.  It follows the character: a
   -- player who has switched back to the red sprite is playing as RED.
@@ -300,9 +300,20 @@ return function(mod)
   --   * Lowercase and "!" are all in the charmap
   --     (src/save_convert/data/charmap.lua), so they encode into a save and
   --     round-trip out of it as themselves rather than as "?".
+  --
+  -- And it takes TWO writes, not one.  The field registry's semantics are
+  -- "deep" (Schemas.lua), and under deep semantics Merge.deepMerge CONCATS
+  -- arrays rather than replacing them -- so a single patch carrying three
+  -- names appends them to vanilla's three and the menu offers six:
+  -- RED / ASH / JACK / WILD / GREEN / VERSION.  That is what 1.19.0 shipped.
+  --
+  -- mod.DELETE unsets a key, so unsetting namePresets in an earlier op and
+  -- writing it in a later one lands on an absent list, which the merge
+  -- copies wholesale instead of extending.  Registry.fold walks a mod's ops
+  -- in order, so two patches to the same id are two ops and the order holds.
   if green and option("name", true) then
     bootPatch.playerName = "GREEN"
-    bootPatch.namePresets = {
+    namesPatch = {
       player = { "WILD", "GREEN", "VERSION" },
       rival = { "Thanks", "For", "Playing!" },
     }
@@ -318,9 +329,17 @@ return function(mod)
 
   if next(title) then bootPatch.title = title end
 
-  if next(bootPatch) then
+  if next(bootPatch) or namesPatch then
     try("field.boot", function()
-      mod.content.field:patch("boot", bootPatch)
+      -- the unset first, so the lists that follow replace vanilla's rather
+      -- than being appended to them
+      if namesPatch then
+        mod.content.field:patch("boot", { namePresets = mod.DELETE })
+      end
+      if next(bootPatch) or namesPatch then
+        if namesPatch then bootPatch.namePresets = namesPatch end
+        mod.content.field:patch("boot", bootPatch)
+      end
     end)
   end
 

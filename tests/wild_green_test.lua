@@ -498,6 +498,47 @@ end
 
 -- ------- the loader's mod table
 
+-- The field registry's semantics are "deep" (src/mods/Schemas.lua), and under
+-- deep semantics Merge.deepMerge CONCATENATES arrays rather than replacing
+-- them.  The stub used to keep the last payload handed to patch(), so every
+-- assertion here read what the mod MEANT rather than what the game would get
+-- -- which is exactly how 1.19.0 shipped a naming menu offering six names.
+--
+-- It folds now, with the two rules that decide this: mod.DELETE unsets a key,
+-- and a list merged over a list appends.  `patches[id]` is the folded value.
+local DELETE = setmetatable({}, { __tostring = function() return "<DELETE>" end })
+
+local function isList(t)
+  if type(t) ~= "table" or next(t) == nil then return false end
+  local n = 0
+  for k in pairs(t) do
+    if type(k) ~= "number" then return false end
+    n = n + 1
+  end
+  for i = 1, n do if t[i] == nil then return false end end
+  return true
+end
+
+local function foldDeep(dst, src)
+  if type(dst) ~= "table" then dst = {} end
+  for key, value in pairs(src) do
+    if value == DELETE then
+      dst[key] = nil
+    elseif isList(value) then
+      if isList(dst[key]) then                    -- the append that bit us
+        for _, item in ipairs(value) do dst[key][#dst[key] + 1] = item end
+      else
+        dst[key] = value
+      end
+    elseif type(value) == "table" then
+      dst[key] = foldDeep(type(dst[key]) == "table" and dst[key] or {}, value)
+    else
+      dst[key] = value
+    end
+  end
+  return dst
+end
+
 local function fakeRegistry(base, log)
   local registry = { base = base, patches = {}, overrides = {} }
   function registry:get(id) return self.base[id] end
@@ -507,7 +548,8 @@ local function fakeRegistry(base, log)
     end)
   end
   function registry:patch(id, partial)
-    self.patches[id] = partial
+    self.patches[id] = foldDeep(self.patches[id]
+      or (self.base[id] and foldDeep({}, self.base[id])) or {}, partial)
     log[#log + 1] = "patch " .. id
   end
   function registry:override(id, value)
@@ -536,6 +578,7 @@ local function fakeMod(options)
   mod.assets = {
     path = function(_, rel) return "mods/wild_green/" .. rel end,
   }
+  mod.DELETE = DELETE            -- src/mods/Loader.lua:1180
 
   mod.content = {
     sprites = fakeRegistry({
@@ -553,7 +596,12 @@ local function fakeMod(options)
     -- nothing at all.  That was the 1.0.0 bug; the stub reproduces the
     -- shape that caused it so the hook is the only route left.
     field = fakeRegistry({
-      boot = { startMap = "REDS_HOUSE_2F" },
+      -- vanilla's own lists are here (src/core/Data.lua fills them from the
+      -- importer's field.presetNames) so a patch that appends to them shows
+      -- up as six names rather than three
+      boot = { startMap = "REDS_HOUSE_2F", namePresets = {
+        player = { "RED", "ASH", "JACK" },
+        rival = { "BLUE", "GARY", "JOHN" } } },
     }, log),
     palettes = fakeRegistry({
       LOGO1 = { { 255, 255, 255 }, { 255, 0, 0 }, { 148, 0, 0 }, { 0, 0, 0 } },
@@ -698,14 +746,21 @@ do
   local boot = mod.content.field.patches.boot
   eq(boot and boot.playerName, "GREEN",
     "the game offers GREEN where it used to offer RED")
+  -- The whole list, not its first entries: vanilla's own three are seeded
+  -- in the stub's base, and the field registry appends lists rather than
+  -- replacing them, so a patch that gets this wrong leaves six names with
+  -- ours at the BACK -- which is what 1.19.0 shipped and reads fine if you
+  -- only ever check presets[1].
   local presets = boot and boot.namePresets and boot.namePresets.player
-  eq(presets and presets[1], "WILD", "the player's list reads WILD")
-  eq(presets and presets[2], "GREEN", "...GREEN")
-  eq(presets and presets[3], "VERSION", "...VERSION, down the cursor")
+  eq(presets and table.concat(presets, "/"), "WILD/GREEN/VERSION",
+    "the player's list is exactly WILD / GREEN / VERSION")
   local rival = boot and boot.namePresets and boot.namePresets.rival
-  eq(rival and rival[1], "Thanks", "the rival's list reads Thanks")
-  eq(rival and rival[2], "For", "...For")
-  eq(rival and rival[3], "Playing!", "...Playing!")
+  eq(rival and table.concat(rival, "/"), "Thanks/For/Playing!",
+    "the rival's is exactly Thanks / For / Playing!")
+  ok(presets and not table.concat(presets, "/"):find("RED", 1, true),
+    "...with no RED / ASH / JACK left in front of them")
+  ok(rival and not table.concat(rival, "/"):find("BLUE", 1, true),
+    "...and no BLUE / GARY / JOHN")
   -- A preset is picked from a menu, never typed, so the seven-character
   -- typing limit does not apply -- but the BOX does.  Menu widens to
   -- `widest + 3` tiles and the intro box asks for 11, so nine characters
@@ -724,8 +779,11 @@ do
   local boot = mod.content.field.patches.boot
   ok(boot == nil or boot.playerName == nil,
     "GREEN NAME LIST off leaves the vanilla default alone")
-  ok(boot == nil or boot.namePresets == nil,
+  local kept = boot and boot.namePresets
+  eq(kept and table.concat(kept.player, "/"), "RED/ASH/JACK",
     "...and the naming menu keeps RED / ASH / JACK")
+  eq(kept and table.concat(kept.rival, "/"), "BLUE/GARY/JOHN",
+    "...and the rival keeps BLUE / GARY / JOHN")
   ok(mod.content.sprites.patches.SPRITE_RED ~= nil,
     "...and the character is still green: the rows are independent")
 end

@@ -2,6 +2,28 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.21.0] - 2026-08-28
+
+### Fixed
+
+- **The naming menu offered six names, not three.** `NEW NAME` listed
+  `RED / ASH / JACK / WILD / GREEN / VERSION` for the player and
+  `BLUE / GARY / JOHN / Thanks / For / Playing!` for the rival — vanilla's
+  three with this mod's three appended, rather than replaced.
+
+  The field registry's semantics are `deep`, and under deep semantics
+  `Merge.deepMerge` concatenates arrays instead of replacing them. One patch
+  carrying a list extends the list already there. `mod.DELETE` unsets a key,
+  so `namePresets` is now unset in one op and written in the next: the write
+  lands on an absent list and is copied wholesale. `Registry.fold` walks a
+  mod's ops in order, so the two stay in the order they were made.
+
+  The test stub recorded the last payload handed to `patch()` rather than
+  folding, so every assertion here read what the mod meant instead of what
+  the game would get. It folds now, with vanilla's lists seeded underneath,
+  and asserts the whole list — the old checks passed on a six-name menu
+  because they only ever looked at `presets[1]`, which was still `WILD`.
+
 ## [1.20.0] - 2026-08-28
 
 ### Fixed

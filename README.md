@@ -320,6 +320,27 @@ it was before, and nothing else in the mod is affected.
 
 [crystal]: https://github.com/distilledorion-sketch/crystal_animated_sprites_with_shiny_visuals
 
+### Replacing a list, in a registry that appends them
+
+The two naming lists are `field.boot.namePresets`, and writing them is not
+one patch. The field registry's semantics are `deep`
+(`src/mods/Schemas.lua`), and under deep semantics `Merge.deepMerge`
+**concatenates** arrays instead of replacing them. So a single patch
+carrying three names appends them to vanilla's three, and the `NEW NAME`
+page offers six — `RED / ASH / JACK / WILD / GREEN / VERSION`, with ours at
+the back. That is what 1.19.0 shipped.
+
+`mod.DELETE` unsets a key. Unsetting `namePresets` in one op and writing it
+in the next lands the write on an absent list, which the merge copies
+wholesale rather than extending — `Registry.fold` walks a mod's ops in
+order, so two patches to the same id stay in the order they were made.
+
+The test stub used to record the last payload handed to `patch()`, which
+meant every assertion read what this mod *meant* rather than what the game
+would get. It folds now, with vanilla's own lists seeded underneath, and
+asserts the whole list rather than its first entry — the old assertions
+passed happily on a six-name menu because `presets[1]` was still `WILD`.
+
 ### The sideburn does not flicker
 
 Vanilla draws the tip of the hair between the cap and the ear as one pixel,
