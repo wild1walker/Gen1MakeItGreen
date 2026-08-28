@@ -7,11 +7,18 @@ own ledger stays "None currently"; these are this mod's divergences.
 
 - **The player wears green.** The overworld walker, the `BICYCLE` sheet where
   the import wrote one, the battle back pic, the front pic that Oak's intro,
-  and the trainer card and the Hall of Fame share are recolored from the player's own imported cache to the Wild
-  Green ramp. Only the outfit shade changes: the face keeps a skin tone and
-  the hair and outline stay black. `PLAYER = RED` turns all of it off.
-- **The default name is `GREEN`**, where the game offered `RED`. It is the
-  only thing here that ends up written into a save, and it has its own row.
+  the trainer card and the Hall of Fame share, and the title screen's
+  standing figure are recolored from the player's own imported cache to the
+  Wild Green ramp. `PLAYER = RED` turns all of it off.
+- **His skin is skin.** On the overworld sheets the face keeps a tan, the
+  lips keep vanilla's red and the cap's bill is a green-tinted white. On the
+  big pictures `PORTRAIT SKIN` finds the face, the ear, the temple and both
+  hands — see the note below for how, since none of it is decided by shade.
+- **The names are `GREEN`.** The name a save gets when you type none, and the
+  list on the naming screen's `NEW NAME` page: `GREEN / WILD / JACK` where
+  the game offered `RED / ASH / JACK`. The rival's three are untouched. It is
+  the only thing here that ends up written into a save, and it has its own
+  row.
 - **The title screen reads `WILD GREEN VERSION`.** One continuous ribbon in
   place of the imported pair of fragments. `TITLE RIBBON = OFF` gives back
   the imported art.
@@ -29,21 +36,25 @@ own ledger stays "None currently"; these are this mod's divergences.
   affected: opponent portraits, the animated battle sprites and the shiny
   reveal all go through other seams.
 
-- **The title screen's standing figure is coloured, never swapped.** His
-  rectangle is cut out of the true-colour region so the cycling mon keeps its
-  palette, and what is left is painted by shade — so recoloured art handed to
-  that draw is thrown away. `MEWMON` colours him in every mode that runs the
-  zone pass, and `TITLE FIGURE` switches that off.
+- **The title screen's standing figure is coloured in most modes and swapped
+  in one.** His rectangle is cut out of the true-colour region so the cycling
+  mon keeps its palette, and what is left is painted by shade — so a
+  recoloured file handed to that draw is thrown away, and `MEWMON` is what
+  colours him. `TITLE FIGURE` switches that off.
 
-- **Under `ADVANCED` he is baked, not palettised, and that is Crystal
-  Animated Sprites' rectangle.** That mode does not run the zone pass over
-  him, and the pinned mod marks his rectangle true-colour there and bakes his
-  grey art to Red's own white / skin / red / navy. This mod wraps
+- **Under `ADVANCED` he is drawn from a file, and that is Crystal Animated
+  Sprites' rectangle.** That mode does not run the zone pass over him, and
+  the pinned mod marks his rectangle true-colour there and bakes his grey art
+  to Red's own white / skin / red / navy. This mod wraps
   `TitleState.currentSprite` outside that wrapper — it is priority 1300 and
-  loads last — and re-bakes from the grey art it captured on the way in, in
-  the trainer card's white / light green / green / black. Turn Crystal
-  Animated Sprites off and `ADVANCED` still gets the green bake; turn
-  `TITLE FIGURE` off and neither happens.
+  loads last — and hands the draw the recipe's own copy of
+  `assets/generated/title/player.png`, which carries the same face, ear and
+  hands the trainer card gets. `TitleState` keeps the path it loaded him
+  from, so the twin is derived from that rather than guessed, and
+  `Assets.image` resolves it through `save/mod-derived`. A cache with no such
+  file falls back to a flat luminance bake. Turn Crystal Animated Sprites off
+  and `ADVANCED` still gets the green figure; turn `TITLE FIGURE` off and
+  neither happens.
 
 - **`PORTRAIT SKIN` reaches two shades, because skin is drawn in two.** The
   face is shade 2 with its brow in shade 3; the hands are shade 3 alone, the
@@ -75,7 +86,7 @@ own ledger stays "None currently"; these are this mod's divergences.
   ride the `player.sprite` hook and change as soon as the pic is re-resolved.
 - **The default name only reaches a new game.** A save that already has a
   name keeps it, which is the point.
-- **A cache without one of the five pictures leaves that picture alone.**
+- **A cache without one of the pictures leaves that picture alone.**
   The recipe skips what `ctx.exists` says is not there, and `main.lua` only
   repoints a record whose art it actually recolored — so a partial import
   degrades one picture at a time instead of drawing nothing.
@@ -84,12 +95,14 @@ own ledger stays "None currently"; these are this mod's divergences.
 
 No map, script, encounter, trainer, item, move or battle behaviour. Nothing
 here is read by anything but the renderer. The mod declares one permission,
-`engine_internals`, and uses it for exactly one thing: `src.ui.TitleState`
-and `src.render.PaletteFX`, to bake the title figure green under `ADVANCED`.
-Nothing else in the mod touches an engine module.
+`engine_internals`, and uses it for the title screen's figure under
+`ADVANCED` and nothing else: `src.ui.TitleState` to get in front of the draw,
+`src.render.PaletteFX` to know the mode and mark the rectangle, and
+`src.render.Assets` to resolve a generated path to the file a transform
+wrote. Nothing else in the mod touches an engine module.
 
 ## Save data
 
-None. The mod stores nothing in the save; its two rows live in the profile's
-mod options like any other. Uninstalling it leaves a save that loads exactly
+None. The mod stores nothing in the save; its five rows live in the
+profile's mod options like any other. Uninstalling it leaves a save that loads exactly
 as it did.
