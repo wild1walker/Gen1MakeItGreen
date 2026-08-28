@@ -219,6 +219,9 @@ return function(ctx)
   local HAND_REACH = 2     -- rows past the shirt a hand may still start
   local DETAIL_MAX = 6     -- sealed inside skin: a brow, never a garment
   local SPECK_MAX = 2      -- or a speck against it: the ear's own shadow
+  local GLINT_MAX = 2      -- a speck of the LIGHT shade inside a hand
+  local TEMPLE_MAX = 3     -- and the specks between the hat and the face
+  local TEMPLE_ROWS = 3    -- which is all the higher this ever looks
 
   -- every 4-connected patch of one shade
   local function connected(shade, w, h, want)
@@ -366,11 +369,53 @@ return function(ctx)
       end
     end
 
+    -- the GLINT: a speck of the LIGHT shade sitting inside skin already
+    -- painted.  On a hand drawn entirely in the mid shade that speck is its
+    -- highlight, and leaving it green puts a green pixel in the middle of a
+    -- hand.  It has to run after the hands, and it only ever looks at skin
+    -- this pass has painted -- every other shade-2 speck on the picture is
+    -- dither on the cap or the knees, and there are twenty-eight of those.
+    for _, pixels in ipairs(light) do
+      if #pixels <= GLINT_MAX then
+        local touching, foreign = 0, false
+        for _, at in ipairs(pixels) do
+          for _, step in ipairs(STEPS) do
+            local nx, ny = at[1] + step[1], at[2] + step[2]
+            if nx >= 0 and nx < w and ny >= 0 and ny < h then
+              if skin[ny] and skin[ny][nx] then touching = touching + 1
+              elseif shade[ny][nx] == 2 then foreign = true end
+            end
+          end
+        end
+        if touching >= 2 and not foreign then paint(pixels) end
+      end
+    end
+
+    -- the TEMPLE: the specks of mid shade between the hat's underside and
+    -- the face.  They touch no skin -- the hat's outline is in the way -- so
+    -- nothing below can reach them, and they are the last of him that is
+    -- still green.  Bounded to the rows just above the face, so the hat's
+    -- own dither is never in range.
+    local isTemple = {}
+    for i, pixels in ipairs(mid) do
+      local t, b = bounds(pixels)
+      if #pixels <= TEMPLE_MAX and b < ftop and b >= ftop - TEMPLE_ROWS then
+        isTemple[i] = true
+      end
+    end
+
     -- the DETAIL: shade 3 sealed inside skin -- the brow, the mouth -- or a
-    -- speck of it against skin, which is the ear's own shadow.
+    -- speck of it against skin, which is the ear's own shadow.  All of it in
+    -- the skin's shadow colour, the temple included: shade 3 is the shade
+    -- BELOW the skin's own everywhere it appears.
     local detail = {}
     for i, pixels in ipairs(mid) do
-      if not isHand[i] and #pixels <= DETAIL_MAX then
+      if isTemple[i] and not isHand[i] then
+        for _, at in ipairs(pixels) do
+          detail[at[2]] = detail[at[2]] or {}
+          detail[at[2]][at[1]] = true
+        end
+      elseif not isHand[i] and #pixels <= DETAIL_MAX then
         local sealed, touching = true, 0
         for _, at in ipairs(pixels) do
           for _, step in ipairs(STEPS) do

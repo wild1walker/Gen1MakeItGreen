@@ -106,9 +106,10 @@ return function(mod)
     -- the one change here with a visible cost: see the note at the override.
     { key = "title_figure", type = "toggle", label = "TITLE FIGURE",
       default = true },
-    -- The name the game offers before you type one.  Its own row because a
-    -- default name is the one thing here that ends up written into a save.
-    { key = "name", type = "toggle", label = "DEFAULT NAME GREEN",
+    -- The names the game OFFERS: the one it falls back to, and the list on
+    -- the NEW NAME menu.  Its own row because a name is the one thing here
+    -- that ends up written into a save.
+    { key = "name", type = "toggle", label = "GREEN NAME LIST",
       default = true },
   })
 
@@ -270,8 +271,20 @@ return function(mod)
 
   -- GREEN where the game used to offer RED.  It follows the character: a
   -- player who has switched back to the red sprite is playing as RED.
+  --
+  -- Two things, because the game asks twice.  playerName is what a save
+  -- gets when no name is chosen (SaveData: `boot.playerName or "RED"`).
+  -- namePresets is the list on the naming screen's first page, under
+  -- NEW NAME -- the engine's own is RED / ASH / JACK, and a boot that does
+  -- not set it gets that as a fallback (OakSpeech.namePresets).  RED
+  -- becomes GREEN and ASH becomes WILD; JACK is vanilla's and stays.
+  --
+  -- Only `player` is named here.  field:patch deep-merges (Registry.fold ->
+  -- Merge.deepMerge), so the rival's own three are left exactly as the
+  -- import wrote them rather than overwritten with a copy of Red's.
   if green and option("name", true) then
     bootPatch.playerName = "GREEN"
+    bootPatch.namePresets = { player = { "GREEN", "WILD", "JACK" } }
   end
 
   if option("ribbon", true) then

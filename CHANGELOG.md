@@ -2,6 +2,36 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.10.0] - 2026-08-28
+
+### Fixed
+
+- **The temple and the hand's highlight.** Three specks of the mid shade sit
+  between the hat's underside and the face — they touch no skin at all, the
+  hat's outline is in the way, so nothing else could reach them and they
+  were the last of his head still green. And a single pixel of the *light*
+  shade sits inside the right hand: on a hand drawn entirely in the mid
+  shade that is its highlight, and leaving it green put a green pixel in the
+  middle of a hand. Both are found now; the whole card is 51 pixels of skin.
+
+### Added
+
+- **The naming screen's list.** `field.boot.namePresets.player` reads
+  **GREEN / WILD / JACK** where vanilla's reads RED / ASH / JACK. Only
+  `player` is named, so the rival's own three survive the deep merge. The
+  `DEFAULT NAME GREEN` row is `GREEN NAME LIST` now, and covers both that
+  list and the fallback name a save gets when nothing is typed.
+
+### Notes
+
+- Both player portraits the engine has are covered. `Sprites.playerPath`
+  resolves exactly two files (`FieldDefaults.PLAYER_PICS`): the back pic,
+  `battle/redb.png`, and the front pic, `trainer_card/red.png` — and the
+  trainer card, Oak's intro, the Hall of Fame and the credits all draw that
+  same front pic. The other four paths in the recipe's list are names an
+  import may or may not have written; `ctx.exists` skips them.
+- All nine clauses are load-bearing: breaking any one fails the suite.
+
 ## [1.9.0] - 2026-08-28
 
 ### Fixed

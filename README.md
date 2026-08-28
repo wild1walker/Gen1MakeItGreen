@@ -23,6 +23,7 @@ It works on its own too. Nothing here depends on either bundle.
 | the title screen | the version ribbon | `field.boot.title` |
 | the title figure | the standing player on that screen | the `MEWMON` palette, and a bake of its own under `ADVANCED` |
 | the default name | `GREEN` where the game offered `RED` | `field.boot.playerName` |
+| the name list | `GREEN / WILD / JACK` on the `NEW NAME` page | `field.boot.namePresets` |
 
 The two battle pics go through the **hook** rather than a registry write, and
 that is not a style choice. `Sprites.playerPath` resolves them through
@@ -48,7 +49,7 @@ WILD GREEN
   PORTRAIT SKIN       ON
   TITLE RIBBON        ON
   TITLE FIGURE        ON
-  DEFAULT NAME GREEN  ON
+  GREEN NAME LIST     ON
 ```
 
 - **`PLAYER`** is the switch back. `RED` gives you the vanilla character
@@ -70,10 +71,15 @@ WILD GREEN
   Under `ADVANCED` the zone pass does not reach him at all and he is baked
   instead, so there the copyright line is untouched. Off gives that screen
   back to the base game either way.
-- **`DEFAULT NAME GREEN`** is the name offered before you type one. It has a
-  row of its own because it is the one thing here that ends up written into
-  a save, and it follows `PLAYER`: switch the character back to red and the
-  name goes back with him.
+- **`GREEN NAME LIST`** is the names the game *offers*. The fallback a save
+  gets when you type nothing is `GREEN` rather than `RED`
+  (`field.boot.playerName`), and the list on the naming screen's `NEW NAME`
+  page reads **GREEN / WILD / JACK** where vanilla's reads RED / ASH / JACK
+  (`field.boot.namePresets.player`). The rival's three are untouched — the
+  patch deep-merges, so only `player` is replaced. It has a row of its own
+  because a name is the one thing here that ends up written into a save, and
+  it follows `PLAYER`: switch the character back to red and the names go
+  back with him.
 
 ## No green pixel ships
 
