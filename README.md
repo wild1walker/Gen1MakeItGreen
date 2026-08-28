@@ -45,6 +45,7 @@ In the mod manager, or in `OPTION > MODS`:
 ```
 WILD GREEN
   PLAYER              GREEN     <- or RED
+  PORTRAIT SKIN       ON
   TITLE RIBBON        ON
   TITLE FIGURE        ON
   DEFAULT NAME GREEN  ON
@@ -54,6 +55,11 @@ WILD GREEN
   everywhere — no recolor is applied at all, and the vanilla art was never
   overwritten to begin with. It decides a `sprites` record, which is settled
   at load, so it takes effect on the next launch.
+- **`PORTRAIT SKIN`** paints the face on the big pictures — the battle back
+  pic, the trainer card, Oak's intro, the credits, the Hall of Fame — the
+  character's own skin instead of the light green. Off is the flat green
+  those pictures wore in 1.4.0. It has a row of its own because the rule
+  that finds the face is a guess about art this mod never sees; see below.
 - **`TITLE RIBBON`** is the branding, and it is independent of `PLAYER`.
   Off gives back the imported ribbon and the imported band colour. On, the
   title says `WILD GREEN VERSION` whichever colour the character is —
@@ -127,9 +133,37 @@ is the light on every surface. Vanilla gets away with one shade for both
 because its ramp is monochrome red — white, light red, red, black — and light
 red happens to look like skin; painting that shade a skin tone put orange
 blotches on the hat and the knees. The portrait gets the same trick in green,
-and neither position rule, because a face-sized rule on face-sized art is
-noise. The face reads as a pale green rather than as skin, which is the same
-compromise vanilla makes in the other direction.
+and neither of the overworld position rules, because a face-sized rule on
+face-sized art is noise.
+
+### Finding the face by what is inside it
+
+Which leaves the face reading as a pale green rather than as skin — and
+`PORTRAIT SKIN` is the way out of that compromise. Nothing about the *shade*
+can pick the face out, because the shade is the light on every surface. What
+can is what is **inside** it: the face is the only patch of shade 2 with
+**eyes** in it — islands of ink whose every neighbour is that one patch. The
+cap's front, the shirt's shading and the knees have nothing inside them at
+all, and the outline is one ink region that runs off the edge of the art
+rather than an island.
+
+The rule **fails closed**, on purpose. Fewer than two eyes, a patch the wrong
+size, a patch too far down the picture, or *two* patches that both look like
+a face, and it paints nothing — and that picture is the flat green of 1.4.0.
+The worst it can do is nothing, never a blotch, which is what makes it safe
+to ship against art this file never sees. The battle back pic is exactly that
+case: there is no face on the back of his head to find.
+
+The recipe writes **both** copies of every portrait — `green/` and
+`greenskin/` — and the row picks between two files that already exist, rather
+than deciding a recolour. That is what makes it a switch you can flip in a
+menu instead of one that needs a release to undo. Where the rule found no
+face the two copies are identical, so the row is a no-op on that picture
+rather than broken.
+
+The title screen's standing figure is not covered by it: that one is baked
+from the grey art at draw time (see below), not read from a file, and it
+keeps the flat green.
 
 That second row is the one this mod got wrong twice. Shade 2 is not clothing;
 it is the skin. 1.0.0 recoloured shades 2 and 3 both, which turned the face

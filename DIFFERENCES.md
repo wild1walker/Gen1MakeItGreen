@@ -45,6 +45,15 @@ own ledger stays "None currently"; these are this mod's divergences.
   Animated Sprites off and `ADVANCED` still gets the green bake; turn
   `TITLE FIGURE` off and neither happens.
 
+- **`PORTRAIT SKIN` finds the face by its eyes, or it finds nothing.** Shade
+  2 on the big pictures is the light on every surface, so the face is picked
+  out by the islands of ink inside it rather than by its colour. Two eyes, a
+  plausible size, high enough in the art, and exactly one candidate — miss
+  any of those and the picture keeps the flat green of 1.4.0. The battle
+  back pic has no face to find and is one of those. The title screen's
+  standing figure is baked at draw time rather than read from a file, so it
+  keeps the flat green either way.
+
 - **The green band is a registry record only under SGB.** `PaletteFX.pal`
   (`src/render/PaletteFX.lua`) short-circuits every named palette to the
   boot-ROM pair under `OG RED`, and reads `data/palettes_gbc` under

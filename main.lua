@@ -45,6 +45,10 @@
 return function(mod)
   local CACHE = "assets/generated/"
   local GREEN = CACHE .. "green/"
+  -- the same portraits with the face painted skin.  A second set of files
+  -- rather than a second recipe: the recipe runs at install and never sees
+  -- the options, so both are written and this picks between them.
+  local SKINNED = CACHE .. "greenskin/"
 
   -- The character's four, lightest first: paper, skin, outfit, ink.  A copy
   -- of the ramp in transforms.lua, which cannot be imported from --
@@ -89,6 +93,13 @@ return function(mod)
       choices = { { "GREEN", "green" }, { "RED", "red" } },
       default = "green" },
     -- The title screen's version ribbon and the band it sits in.
+    -- The face on the big pictures -- the battle back pic, the trainer card,
+    -- Oak's intro, the credits, the Hall of Fame.  Its own row because the
+    -- rule that finds it is a guess about a picture this mod never sees, and
+    -- a guess a player can switch off is a different thing from one they
+    -- cannot.  See the note over greenOf.
+    { key = "portrait_skin", type = "toggle", label = "PORTRAIT SKIN",
+      default = true },
     { key = "ribbon", type = "toggle", label = "TITLE RIBBON",
       default = true },
     -- The standing figure on the title screen.  Its own row because it is
@@ -115,25 +126,44 @@ return function(mod)
   -- will swap.  It is the same list, in the same order, and tools/check.py
   -- compares the two -- because a swap to a green file the recipe did not
   -- write does not fall back to the red one, it draws nothing at all.
+  -- Same shape as the recipe's own list, second value and all: true is an
+  -- overworld sheet, false is a portrait.  Portraits are the ones with a
+  -- skinned twin, so the two files have to agree about which is which.
   local RECOLOURED = {
-    "sprites/red.png",
-    "sprites/red_bike.png",
-    "battle/redb.png",
-    "battle/back/redb.png",
-    "trainer_card/red.png",
-    "credits/red.png",
-    "intro/red.png",
-    "hall_of_fame/red.png",
+    { "sprites/red.png", true },
+    { "sprites/red_bike.png", true },
+    { "battle/redb.png", false },
+    { "battle/back/redb.png", false },
+    { "trainer_card/red.png", false },
+    { "credits/red.png", false },
+    { "intro/red.png", false },
+    { "hall_of_fame/red.png", false },
   }
 
-  local KNOWN = {}
-  for _, rel in ipairs(RECOLOURED) do KNOWN[rel] = true end
+  local KNOWN, PORTRAIT = {}, {}
+  for _, entry in ipairs(RECOLOURED) do
+    KNOWN[entry[1]] = true
+    if not entry[2] then PORTRAIT[entry[1]] = true end
+  end
+
+  -- ------- PORTRAIT SKIN, and why it is a file and not a flag
+  --
+  -- Shade 2 on a portrait is the light for everything, so the monochrome
+  -- ramp is what keeps the cap and the knees from going orange.  The recipe
+  -- writes a second copy of each portrait with one patch of that shade --
+  -- the one with eyes in it -- painted the character's skin instead, and
+  -- fails closed to the monochrome copy when it cannot find exactly one.
+  --
+  -- So this is a choice between two files that both exist, not a recolour
+  -- decided here.  Off is exactly 1.4.0's picture.
+  local skinned = option("portrait_skin", true)
 
   -- The green twin of a cache path, or nil when there is not one.
   local function greenOf(path)
     if type(path) ~= "string" then return nil end
     local rel = path:match("^" .. CACHE .. "(.+)$")
     if not rel or not KNOWN[rel] then return nil end
+    if skinned and PORTRAIT[rel] then return SKINNED .. rel end
     return GREEN .. rel
   end
 

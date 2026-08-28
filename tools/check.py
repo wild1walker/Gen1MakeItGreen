@@ -105,22 +105,31 @@ def check_extras():
                  % (name, got and hexof(got), hexof(want)))
 
 
+ENTRY = re.compile(r'\{\s*"([^"]+)"\s*,\s*(true|false)\s*\}')
+
+
 def check_pics():
     """The recipe's list and the hook's list are the same list.
 
-    They have to be.  A swap to a green file the recipe did not write does
-    not fall back to the red one -- the image fails to load and the draw
-    shows nothing at all -- so the hook must only ever name a picture the
-    recipe covers.
+    They have to be, name and flag both.  A swap to a green file the recipe
+    did not write does not fall back to the red one -- the image fails to
+    load and the draw shows nothing at all -- so the hook must only ever name
+    a picture the recipe covers.
+
+    The flag is `field`: true is an overworld sheet, false is a portrait.
+    The recipe writes a skinned twin for every portrait and the hook points
+    PORTRAIT SKIN at exactly those, so a picture the two files disagree about
+    is a row that silently does nothing on it, or points at a file that is
+    not there.
     """
-    recipe = re.findall(r'\{\s*"([^"]+)"\s*,\s*(?:true|false)\s*\}',
-                        (ROOT / "transforms.lua").read_text(encoding="utf-8"))
+    recipe = ENTRY.findall(
+        (ROOT / "transforms.lua").read_text(encoding="utf-8"))
     text = (ROOT / "main.lua").read_text(encoding="utf-8")
     block = re.search(r"local RECOLOURED = \{(.*?)\n  \}", text, re.S)
     if block is None:
         fail("main.lua", "no RECOLOURED list to compare")
         return
-    hook = re.findall(r'"([^"]+\.png)"', block.group(1))
+    hook = ENTRY.findall(block.group(1))
     if recipe != hook:
         fail("PICS", "the recipe recolours %s but the hook swaps %s"
              % (recipe, hook))

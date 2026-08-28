@@ -194,6 +194,98 @@ do
   eq(hex(px[8][3]), "000000", "ink is still ink")
 end
 
+io.write("transforms.lua -- the face on a portrait\n")
+do
+  -- Shade 2 on a portrait is the light for everything, so nothing about the
+  -- shade says which of it is the face.  What does: the face is the only
+  -- patch of it with EYES in it -- islands of ink whose every neighbour is
+  -- that one patch.  The cap's front, the shirt's shading and the knees
+  -- below have nothing inside them, and the outline runs off the edge of the
+  -- art rather than being an island.
+  local PORTRAIT = {
+    { W, W, K, K, K, K, K, K, W, W, W, W },  -- 0  the cap's outline
+    { W, K, O, O, O, O, O, O, K, W, W, W },  -- 1  the cap
+    { W, K, O, O, O, O, O, O, K, W, W, W },  -- 2
+    { W, K, S, S, S, S, S, S, K, W, W, W },  -- 3  the face
+    { W, K, S, K, S, S, K, S, K, W, W, W },  -- 4  two eyes, enclosed by it
+    { W, K, S, S, S, S, S, S, K, W, W, W },  -- 5
+    { W, K, S, S, S, S, S, S, K, W, W, W },  -- 6
+    { W, W, K, K, K, K, K, K, W, W, W, W },  -- 7  the jaw
+    { W, W, K, O, O, O, O, K, W, W, W, W },  -- 8  the shirt
+    { W, W, K, O, S, S, O, K, W, W, W, W },  -- 9  its highlight: shade 2,
+    { W, W, K, O, S, S, O, K, W, W, W, W },  -- 10 and no eyes in it
+    { W, W, K, O, O, O, O, K, W, W, W, W },  -- 11
+    { W, W, W, K, S, S, K, W, W, W, W, W },  -- 12 the knees: shade 2 again
+    { W, W, W, K, K, K, K, W, W, W, W, W },  -- 13
+  }
+
+  local ctx = fakeCtx({ ["trainer_card/red.png"] = PORTRAIT })
+  chunk(MOD .. "transforms.lua")(ctx)
+
+  local plain = ctx.written["green/trainer_card/red.png"]
+  local skin = ctx.written["greenskin/trainer_card/red.png"]
+  ok(plain ~= nil and skin ~= nil, "both copies of the portrait are written")
+
+  -- the monochrome copy is untouched by any of this
+  eq(hex(plain.out[4][3]), "a8dd8a", "green/ leaves the face the light green")
+  eq(hex(plain.out[10][5]), "a8dd8a", "...and the shirt's highlight with it")
+
+  -- and the skinned copy paints the face, and only the face
+  eq(hex(skin.out[4][3]), "f0a363", "greenskin/ paints the face skin")
+  eq(hex(skin.out[6][3]), "f0a363", "...all of it, not just the eye row")
+  eq(hex(skin.out[5][4]), "000000", "the eyes stay ink")
+  eq(hex(skin.out[2][3]), "65ba3f", "the cap is still the outfit green")
+  eq(hex(skin.out[10][5]), "a8dd8a",
+    "the shirt's highlight is still the light green -- no eyes in it")
+  eq(hex(skin.out[13][5]), "a8dd8a", "...and so are the knees")
+  eq(hex(skin.out[1][1]), "ffffff", "the ground is still paper")
+end
+
+io.write("transforms.lua -- the face rule fails closed\n")
+do
+  -- No eyes, so no face, so the skinned copy is the monochrome one.  This is
+  -- the battle BACK pic's case, and the case of any art the rule does not
+  -- fit: the worst it can do is nothing.
+  local NO_EYES = {
+    { W, W, K, K, K, K, K, K, W, W, W, W },
+    { W, K, O, O, O, O, O, O, K, W, W, W },
+    { W, K, S, S, S, S, S, S, K, W, W, W },
+    { W, K, S, S, S, S, S, S, K, W, W, W },
+    { W, K, S, S, S, S, S, S, K, W, W, W },
+    { W, W, K, K, K, K, K, K, W, W, W, W },
+  }
+  local ctx = fakeCtx({ ["battle/redb.png"] = NO_EYES })
+  chunk(MOD .. "transforms.lua")(ctx)
+  local skin = ctx.written["greenskin/battle/redb.png"]
+  ok(skin ~= nil, "the skinned copy is still written")
+  eq(hex(skin.out[3][3]), "a8dd8a",
+    "with no eyes to find, nothing is painted skin")
+  eq(hex(skin.out[2][3]), "65ba3f", "and the outfit is untouched")
+end
+
+do
+  -- Two patches that both look like a face is not two faces found, it is a
+  -- rule that does not fit this picture.  It declines rather than guessing.
+  local HEAD = {
+    { W, W, K, K, K, K, K, K, W, W, W, W },
+    { W, K, O, O, O, O, O, O, K, W, W, W },
+    { W, K, S, S, S, S, S, S, K, W, W, W },
+    { W, K, S, K, S, S, K, S, K, W, W, W },
+    { W, K, S, S, S, S, S, S, K, W, W, W },
+    { W, W, K, K, K, K, K, K, W, W, W, W },
+  }
+  local TWO = {}
+  for _ = 1, 2 do
+    for _, row in ipairs(HEAD) do TWO[#TWO + 1] = row end
+  end
+  local ctx = fakeCtx({ ["credits/red.png"] = TWO })
+  chunk(MOD .. "transforms.lua")(ctx)
+  local skin = ctx.written["greenskin/credits/red.png"]
+  eq(hex(skin.out[3][3]), "a8dd8a",
+    "two candidate faces means none is painted")
+  eq(hex(skin.out[9][3]), "a8dd8a", "...on either of them")
+end
+
 io.write("transforms.lua -- every picture is covered\n")
 do
   -- The hook only swaps what the recipe writes, so a picture named in one
@@ -227,7 +319,11 @@ do
     wrote[rel] = true
     count = count + 1
   end
-  eq(count, 4, "only what this cache carries is written")
+  eq(count, 6, "only what this cache carries is written")
+  ok(wrote["greenskin/battle/redb.png"] and wrote["greenskin/trainer_card/red.png"],
+    "...and every portrait gets a skinned twin beside it")
+  ok(not wrote["greenskin/sprites/red.png"],
+    "an overworld sheet gets no skinned twin: it already has a face rule")
   for _, rel in ipairs({ "sprites/red.png", "sprites/red_bike.png",
                          "battle/redb.png", "trainer_card/red.png" }) do
     ok(wrote["green/" .. rel], "green/" .. rel .. " written")
@@ -244,7 +340,8 @@ do
 
   -- nothing lands on a cache path, which is what keeps the RED switch alive
   for rel in pairs(ctx.written) do
-    ok(rel:sub(1, 6) == "green/", rel .. " is under green/")
+    ok(rel:sub(1, 6) == "green/" or rel:sub(1, 10) == "greenskin/",
+      rel .. " is under a prefix that shadows nothing")
   end
 
   local shades = ctx.written["green/sprites/red.png"].shades
@@ -371,20 +468,20 @@ do
 
   local back, backCtx = through("assets/generated/battle/redb.png",
     { side = "back", kind = "battle" })
-  eq(back, "assets/generated/green/battle/redb.png",
+  eq(back, "assets/generated/greenskin/battle/redb.png",
     "the battle back pic is swapped for the green one")
   eq(backCtx.trueColor, true,
     "...and marked true-colour, so the palette pass leaves it alone")
 
   local front = through("assets/generated/trainer_card/red.png",
     { side = "front", kind = "intro" })
-  eq(front, "assets/generated/green/trainer_card/red.png",
+  eq(front, "assets/generated/greenskin/trainer_card/red.png",
     "the front pic Oak's intro and the card share is swapped")
 
   -- Whatever the engine resolved is what gets a green twin: no filename
   -- whitelist, so a cache that spells one differently still works.
   eq(through("assets/generated/battle/back/redb.png", {}),
-    "assets/generated/green/battle/back/redb.png",
+    "assets/generated/greenskin/battle/back/redb.png",
     "an unexpected cache path is still swapped, not ignored")
 
   eq(through("assets/generated/battle/oldmanb.png", { demo = true }),
@@ -431,6 +528,38 @@ do
   ok(rows.player ~= nil, "a PLAYER row is defined")
   eq(rows.player and rows.player.default, "green", "...defaulting to green")
   ok(rows.ribbon ~= nil, "a TITLE RIBBON row is defined")
+end
+
+io.write("main.lua -- PORTRAIT SKIN\n")
+do
+  local on = run({ player = "green", portrait_skin = true })
+  local hook = on.hooks.wrapped["player.sprite"]
+  local function through(mod, path)
+    return mod.hooks.wrapped["player.sprite"](function(p) return p end, path, {})
+  end
+  eq(through(on, "assets/generated/trainer_card/red.png"),
+    "assets/generated/greenskin/trainer_card/red.png",
+    "on, a portrait comes from the skinned set")
+  eq(through(on, "assets/generated/sprites/red.png"),
+    "assets/generated/green/sprites/red.png",
+    "...and an overworld sheet never does: it has its own face rule")
+  ok(hook ~= nil, "the hook is still the seam")
+
+  local off = run({ player = "green", portrait_skin = false })
+  eq(through(off, "assets/generated/trainer_card/red.png"),
+    "assets/generated/green/trainer_card/red.png",
+    "off, the portrait is the monochrome copy -- exactly 1.4.0's picture")
+  eq(through(off, "assets/generated/battle/redb.png"),
+    "assets/generated/green/battle/redb.png",
+    "...on every portrait")
+  ok(off.content.sprites.patches.SPRITE_RED ~= nil,
+    "and the overworld player is still green: the rows are independent")
+
+  local rows = {}
+  for _, row in ipairs(on.options.defined or {}) do rows[row.key] = row end
+  ok(rows.portrait_skin ~= nil, "a PORTRAIT SKIN row is defined")
+  eq(rows.portrait_skin and rows.portrait_skin.default, true,
+    "...defaulting to on")
 end
 
 io.write("main.lua -- the default name\n")

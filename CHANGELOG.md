@@ -2,6 +2,45 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.5.0] - 2026-08-28
+
+### Added
+
+- **`PORTRAIT SKIN`** — the face on the big pictures is the character's own
+  skin (`#f0a363`) instead of the light green, and the cap, the shirt's
+  shading and the knees keep the green they have. Those are all the same
+  shade, which is why 1.3.0 gave up and went monochrome; nothing about the
+  shade can tell them apart.
+
+  What can is what is *inside* the face: it is the only patch of shade 2
+  with **eyes** in it — islands of ink whose every neighbour is that one
+  patch. The cap's front, the shirt and the knees have nothing inside them,
+  and the outline is one ink region that runs off the edge of the art rather
+  than an island.
+
+  The rule **fails closed**. Fewer than two eyes, a patch the wrong size, a
+  patch too far down the picture, or two patches that both look like a face,
+  and nothing is painted — and that picture is exactly the flat green of
+  1.4.0. The worst it can do is nothing, never a blotch, which is what makes
+  it safe against art this mod never sees. The battle back pic is that case
+  by construction: there is no face on the back of his head.
+
+  The recipe writes **both** copies of every portrait, `green/` and
+  `greenskin/`, and the row picks between two files that already exist. So
+  it is a switch in a menu rather than a recolour that needs a release to
+  undo, and where no face was found the two copies are identical.
+
+  Not covered: the title screen's standing figure, which is baked from the
+  grey art at draw time rather than read from a file, and keeps the flat
+  green.
+
+### Changed
+
+- `main.lua`'s `RECOLOURED` list carries the recipe's `field` flag as well as
+  the path, and `tools/check.py` compares both — a picture the two files
+  disagree about is a row that silently does nothing on it, or one that
+  points at a file that is not there.
+
 ## [1.4.0] - 2026-08-28
 
 ### Fixed

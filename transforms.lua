@@ -171,7 +171,137 @@ return function(ctx)
 
   local STEPS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 
-  local function recoloured(rel, field)
+  -- ------- the face on a portrait, which shade 2 cannot tell you
+  --
+  -- Shade 2 on the 56x56 art is the light for EVERYTHING -- the cap's front,
+  -- the shirt's shading, the knees, the shoes -- so no rule about the shade
+  -- can pick the face out of it, and painting the shade skin is what put
+  -- orange on the hat in 1.2.0.  That is why the portrait went monochrome.
+  --
+  -- What CAN pick it out is what is inside it.  The face is the only patch
+  -- of shade 2 with EYES in it: small islands of ink whose every neighbour
+  -- is that one patch.  The cap's front, the shirt and the knees have
+  -- nothing inside them at all, and the outline is one big ink region that
+  -- runs off the edge of the art rather than an island.
+  --
+  -- This deliberately fails CLOSED.  Fewer than two eyes, a region the wrong
+  -- size, a region too far down the art, or TWO regions that both look like
+  -- faces, and it returns nothing -- and the picture is the monochrome green
+  -- that is on screen today.  The worst case is no change, never a blotch,
+  -- which is what makes it safe to ship against art this file never sees.
+  local EYE_MAX = 6       -- an island bigger than this is not an eye
+  local EYES = 2          -- and a face has two of them
+  local FACE_MIN = 6      -- smaller than this is a speck, not a face
+  local FACE_MAX = 400    -- bigger than this is the whole shirt
+  local FACE_DEPTH = 0.7  -- how far down the art a face may still begin
+
+  local function faceMask(shade, w, h)
+    -- the art's opaque box, so "high in the picture" means something on a
+    -- pic that is mostly padding
+    local top, bottom
+    for y = 0, h - 1 do
+      for x = 0, w - 1 do
+        if shade[y][x] ~= 0 then
+          if not top then top = y end
+          bottom = y
+          break
+        end
+      end
+    end
+    if not top then return nil end
+    local depth = top + (bottom - top + 1) * FACE_DEPTH
+
+    -- label every patch of shade 2.  Scanning top-down means the first pixel
+    -- of a patch is also its highest, which is the only geometry this needs.
+    local region, regions = {}, {}
+    for y = 0, h - 1 do region[y] = {} end
+    for y = 0, h - 1 do
+      for x = 0, w - 1 do
+        if shade[y][x] == 2 and not region[y][x] then
+          local id = #regions + 1
+          local pixels, stack = {}, { { x, y } }
+          region[y][x] = id
+          while #stack > 0 do
+            local at = table.remove(stack)
+            pixels[#pixels + 1] = at
+            for _, step in ipairs(STEPS) do
+              local nx, ny = at[1] + step[1], at[2] + step[2]
+              if nx >= 0 and nx < w and ny >= 0 and ny < h
+                  and shade[ny][nx] == 2 and not region[ny][nx] then
+                region[ny][nx] = id
+                stack[#stack + 1] = { nx, ny }
+              end
+            end
+          end
+          regions[id] = { pixels = pixels, eyes = 0, top = y }
+        end
+      end
+    end
+
+    -- every island of ink, and the one patch of shade 2 that encloses it.
+    -- Touching the edge of the art, touching paper, touching the outfit, or
+    -- touching two different patches all disqualify it: an eye is
+    -- surrounded by face and by nothing else.
+    local seen = {}
+    for y = 0, h - 1 do seen[y] = {} end
+    for y = 0, h - 1 do
+      for x = 0, w - 1 do
+        if shade[y][x] == 4 and not seen[y][x] then
+          local pixels, stack = {}, { { x, y } }
+          local host, open = nil, false
+          seen[y][x] = true
+          while #stack > 0 do
+            local at = table.remove(stack)
+            pixels[#pixels + 1] = at
+            for _, step in ipairs(STEPS) do
+              local nx, ny = at[1] + step[1], at[2] + step[2]
+              if nx < 0 or nx >= w or ny < 0 or ny >= h then
+                open = true
+              else
+                local s = shade[ny][nx]
+                if s == 4 then
+                  if not seen[ny][nx] then
+                    seen[ny][nx] = true
+                    stack[#stack + 1] = { nx, ny }
+                  end
+                elseif s == 2 then
+                  local id = region[ny][nx]
+                  if host == nil then host = id
+                  elseif host ~= id then open = true end
+                else
+                  open = true
+                end
+              end
+            end
+          end
+          if not open and host and #pixels <= EYE_MAX then
+            regions[host].eyes = regions[host].eyes + 1
+          end
+        end
+      end
+    end
+
+    local found
+    for _, r in ipairs(regions) do
+      if r.eyes >= EYES and #r.pixels >= FACE_MIN and #r.pixels <= FACE_MAX
+          and r.top <= depth then
+        -- two patches that both look like a face is not a face found, it is
+        -- a rule that does not fit this picture
+        if found then return nil end
+        found = r
+      end
+    end
+    if not found then return nil end
+
+    local mask = {}
+    for _, at in ipairs(found.pixels) do
+      mask[at[2]] = mask[at[2]] or {}
+      mask[at[2]][at[1]] = true
+    end
+    return mask
+  end
+
+  local function recoloured(rel, field, face)
     local ramp = field and WILD_GREEN or WILD_GREEN_PIC
     local bill = field
     local src = ctx.readImage(rel)
@@ -245,12 +375,17 @@ return function(ctx)
       end
     end
 
+    -- only asked for on the skinned copy of a portrait; nil is the answer
+    -- that leaves the picture monochrome
+    local skin = (not field) and face and faceMask(shade, w, h) or nil
+
     out:mapPixel(function(x, y, r, g, b, a)
       if a == 0 then return r, g, b, a end
       local s = shade[y][x]
       local colour = ramp[s]
       if not field then
-        -- the portrait: the ramp and nothing else
+        -- the portrait: the ramp, and the face if one was found
+        if skin and skin[y] and skin[y][x] then colour = WILD_GREEN[2] end
       elseif s == 3 and beside(x, y, -1) == 2 and beside(x, y, 1) == 2 then
         -- a mouth: the outfit's shade, but enclosed by face
         colour = MOUTH
@@ -276,6 +411,20 @@ return function(ctx)
           field and WILD_GREEN or WILD_GREEN_PIC)
       end
       ctx.writeImage(image, "green/" .. rel)
+
+      -- A second copy of every portrait with the face painted skin, which is
+      -- what the PORTRAIT SKIN row picks between.  Two files rather than one
+      -- decided here, because the recipe runs at install and never sees the
+      -- options -- and because it makes the rule something a player can turn
+      -- off in a menu rather than something that needs a release to undo.
+      --
+      -- When the rule finds no face the two copies are identical, so the row
+      -- is a no-op on that picture rather than broken.  The battle BACK pic
+      -- is exactly that case: there is no face on it to find.
+      if not field then
+        local okSkin, skinned = pcall(recoloured, rel, field, true)
+        ctx.writeImage(okSkin and skinned or image, "greenskin/" .. rel)
+      end
     end
   end
 end
