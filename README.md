@@ -95,6 +95,12 @@ cart's shell and the cart's label:
 | outfit | `#65ba3f` | the cap and clothes — the reference green |
 | ink | `#000000` | outline and hair |
 
+and one colour that is not a shade at all:
+
+| | | |
+|---|---|---|
+| mouth | `#ec4d29` | the lips — vanilla's own, sampled off red Red |
+
 That second row is the one this mod got wrong twice. Shade 2 is not clothing;
 it is the skin. 1.0.0 recoloured shades 2 and 3 both, which turned the face
 green with the cap and read as one green blob. 1.1.0 made it `#f8d8a8` and
@@ -129,19 +135,29 @@ Red's overworld mouth is one block of the *cap's* colour sitting in the
 middle of his face, so a flat shade remap paints it with the clothes — green
 lips. It cannot be told apart by shade, because it is the same shade; only by
 where it sits. A shade-3 pixel with skin on both sides of it in the same row
-is enclosed by face and is not clothing. The cap and the clothes are bounded
-by black, never by skin, so they are never caught by it.
+is enclosed by face and is not clothing, so it is painted in the lips'
+colour instead. That colour is vanilla's own: Red's mouth is drawn in the
+*cap's* shade, which is why it comes out red and reads as lips at all.
+Painting it skin, as 1.1.2 did, does not fix it so much as delete it. The cap
+and the clothes are bounded by black, never by skin, so they are never caught
+by the rule.
 
 The bill of the cap is the same problem the other way round. Vanilla draws it
 in the *face's* shade — on red Red the bill and the face are the same colour
 and nobody notices, but put a green cap above it and the hat reads as having
 no bill. A shade-2 pixel sitting directly under a shade-3 one is the bill,
-and it goes with the hat. The face is not caught by it, because a black row
-separates the two.
+and it goes with the hat.
 
-That second rule runs on the overworld sheets only: there the cap is a
-handful of pixels, but on the 56×56 trainer card there are dozens of
-shade-2-under-shade-3 adjacencies that are shading rather than a bill.
+*Any* of its four neighbours, not just the one above: facing down the bill
+sits under the cap, but in profile it sticks out beside it. 1.1.3 looked only
+upward, so the front frames had a green bill and the side frames a skin one,
+and the two disagreed. What keeps the face out of it is height — the cap and
+its bill live in the top rows of each 16px frame, the face begins below them.
+
+That second rule runs on the overworld sheets only, where the frames really
+are a 16px stack and the cap is a handful of pixels. On the 56×56 trainer
+card there are dozens of shade-2-touching-shade-3 adjacencies that are
+shading rather than a bill.
 
 **The title band** is lettering on white, not a sprite, so it gets its own —
 and both greens are dark enough to read as ink at 8px, which the character's

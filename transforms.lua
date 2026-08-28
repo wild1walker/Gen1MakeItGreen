@@ -50,6 +50,12 @@ return function(ctx)
     { 0x00, 0x00, 0x00 },   -- ink    -- outline and hair
   }
 
+  -- Not a shade.  Red's lips are drawn in the CAP's shade, so in vanilla they
+  -- come out the same red as his hat -- which is why they read as lips at all.
+  -- 1.1.2 turned them skin and they vanished; this is vanilla's own colour,
+  -- sampled off red Red, so they read as lips on a green hat too.
+  local MOUTH = { 0xec, 0x4d, 0x29 }
+
   -- Every picture of the player, by its cache-relative path.
   --
   --   sprites/red.png        the overworld walker (SPRITE_RED, 16x96)
@@ -105,6 +111,12 @@ return function(ctx)
 
   local REACH = 3
 
+  -- The overworld sheets are 16x16 frames stacked into one column (Art
+  -- Pipeline: "Overworld character sprites"), so a frame-local row is y % 16.
+  -- The cap and its bill sit in the top few of those rows; the face begins
+  -- below them, which is what keeps the face out of the bill rule.
+  local FRAME, BILL_ROWS = 16, 6
+
   local function shadeOf(r)
     if r > 0.83 then return 1 end
     if r > 0.5 then return 2 end
@@ -139,12 +151,22 @@ return function(ctx)
       local colour = WILD_GREEN[shade]
       if shade == 3 and neighbour(x, y, -1) == 2 and neighbour(x, y, 1) == 2 then
         -- a mouth: the outfit's shade, but enclosed by face
-        colour = WILD_GREEN[2]
-      elseif brim and shade == 2 and shadeAt(x, y - 1) == 3 then
-        -- the cap's bill: the face's shade, but sitting directly under the
-        -- cap.  Vanilla draws it in the same shade as the skin, so it is the
-        -- same colour as his face there too -- which on a green cap reads as
-        -- the hat having no bill at all.  It goes with the hat instead.
+        colour = MOUTH
+      elseif brim and shade == 2 and y % FRAME < BILL_ROWS
+          and (shadeAt(x, y - 1) == 3 or shadeAt(x, y + 1) == 3
+               or shadeAt(x - 1, y) == 3 or shadeAt(x + 1, y) == 3) then
+        -- the cap's bill: the face's shade, but touching the cap and high up
+        -- in the frame.  Vanilla draws it in the skin's shade, so on red Red
+        -- the bill and the face are the same colour and nobody notices; a
+        -- green cap over a skin-coloured bill reads as no bill at all.
+        --
+        -- Any of the four neighbours, not just above.  Facing down the bill
+        -- sits UNDER the cap; facing sideways it sticks out BESIDE it, which
+        -- 1.1.3's above-only rule missed -- so the front view had a green bill
+        -- and the side view a skin one, and the two disagreed.
+        --
+        -- BILL_ROWS is what keeps the face out of it: the cap and its bill
+        -- live in the top of each 16px frame, the face begins below them.
         colour = WILD_GREEN[3]
       end
       return colour[1] / 255, colour[2] / 255, colour[3] / 255, a
@@ -162,6 +184,8 @@ return function(ctx)
       -- on the 56x56 trainer card there are dozens of shade-2-under-shade-3
       -- adjacencies that are shading, not a bill, and every one of them would
       -- turn green.
+      -- ...and only when the sheet really is a stack of 16px frames, since
+      -- y % 16 means nothing otherwise.
       local brim = rel:match("^sprites/") ~= nil
       local ok, image = pcall(mouthAware, rel, brim)
       if not ok then

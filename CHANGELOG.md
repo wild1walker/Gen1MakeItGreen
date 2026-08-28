@@ -2,7 +2,23 @@
 
 All notable changes to this mod are recorded here, newest first.
 
-## [1.1.3] - unreleased
+## [1.1.4] - unreleased
+
+### Fixed
+
+- **The lips are red again, not gone.** 1.1.2 painted the mouth skin, which
+  did not fix it so much as delete it. Red's lips are drawn in the *cap's*
+  shade, which is why they come out red in vanilla and read as lips at all —
+  so they are painted `#ec4d29`, vanilla's own colour sampled off red Red,
+  rather than either the clothes' green or the face's tan.
+- **The bill was green facing down and skin facing sideways.** 1.1.3's rule
+  only looked directly above a pixel. Facing down the bill sits *under* the
+  cap, but in profile it sticks out *beside* it, so the side frames kept the
+  vanilla colour and the two views disagreed. Any of the four neighbours
+  counts now, bounded to the top rows of each 16px frame so the face below
+  is never caught by it.
+
+## [1.1.3] - 2026-08-28
 
 ### Fixed
 

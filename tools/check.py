@@ -36,7 +36,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from palette import RAMP, TITLE_RAMP, hexof  # noqa: E402
+from palette import EXTRA, RAMP, TITLE_RAMP, hexof  # noqa: E402
 
 # (file, the table in it, what tools/palette.py says it must be)
 RAMPS = (
@@ -84,6 +84,21 @@ def check_palettes():
                     " ".join(hexof(c) for c in expected)))
 
 
+def check_extras():
+    """The colours that are not shades: MOUTH, told apart by position."""
+    text = (ROOT / "transforms.lua").read_text(encoding="utf-8")
+    for name, want in EXTRA.items():
+        at = text.find("local " + name)
+        if at < 0:
+            fail("transforms.lua", "no %s to check" % name)
+            continue
+        found = ROW.findall(text[at:at + 200])
+        got = tuple(int(c, 16) for c in found[0]) if found else None
+        if got != want:
+            fail("transforms.lua", "%s is %s; tools/palette.py says %s"
+                 % (name, got and hexof(got), hexof(want)))
+
+
 def check_generated():
     """A rebuild has to produce the bytes that are committed."""
     if not RIBBON.is_file():
@@ -103,6 +118,7 @@ def check_generated():
 
 def main():
     check_palettes()
+    check_extras()
     check_generated()
     for finding in findings:
         print("check: %s" % finding)

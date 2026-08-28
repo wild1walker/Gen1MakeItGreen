@@ -123,15 +123,28 @@ end
 -- with a shade-3 mouth in the middle of it, over a row of solid shade-3
 -- clothing bounded by black.  The mouth is the outfit's own shade -- that is
 -- the whole problem -- so only where it sits can tell them apart.
+-- One 16-row frame, because the bill rule reads y % 16: the cap and its bill
+-- live in the top rows, the face below them.  Row 4 is the side view's bill,
+-- which sticks out BESIDE the cap rather than under it -- the case 1.1.3's
+-- above-only rule missed.
 local W, S, O, K = 255, 170, 85, 0
 local FACE = {
-  { K, O, O, O, O, O, K },   -- the cap: shade 3
-  { K, S, S, S, S, S, K },   -- the bill: shade 2, directly under the cap
-  { K, K, K, K, K, K, K },
-  { K, S, S, S, S, S, K },   -- the face: shade 2, black above it
-  { K, S, K, S, K, S, K },   -- eyes
-  { K, S, S, O, S, S, K },   -- the mouth: shade 3, skin either side
-  { K, K, O, O, O, K, K },   -- the collar: shade 3 bounded by black
+  { K, O, O, O, O, O, K },   -- 0  the cap: shade 3
+  { K, S, S, S, S, S, K },   -- 1  the bill under the cap (facing down)
+  { S, O, O, O, O, O, K },   -- 2  the bill beside the cap (facing sideways)
+  { K, K, K, K, K, K, K },   -- 3
+  { K, K, K, K, K, K, K },   -- 4
+  { K, K, K, K, K, K, K },   -- 5
+  { K, S, S, S, S, S, K },   -- 6  the face begins below BILL_ROWS
+  { K, S, K, S, K, S, K },   -- 7  eyes
+  { K, S, S, O, S, S, K },   -- 8  the mouth: shade 3, skin either side
+  { K, K, O, O, O, K, K },   -- 9  the collar: shade 3 bounded by black
+  { K, S, S, S, S, S, K },   -- 10 more face, deep in the frame
+  { K, K, K, K, K, K, K },   -- 11
+  { K, K, K, K, K, K, K },   -- 12
+  { K, K, K, K, K, K, K },   -- 13
+  { K, K, K, K, K, K, K },   -- 14
+  { K, K, K, K, K, K, K },   -- 15
 }
 
 local function hex(c) return ("%02x%02x%02x"):format(c[1], c[2], c[3]) end
@@ -143,15 +156,19 @@ do
   local out = ctx.written["green/sprites/red.png"]
   ok(out ~= nil and out.out ~= nil, "the per-pixel path ran")
   local px = out and out.out
-  eq(px and hex(px[6][4]), "f0a363",
-    "the mouth is skin, not green -- it has skin on both sides")
-  eq(px and hex(px[7][3]), "65ba3f",
+  eq(px and hex(px[9][4]), "ec4d29",
+    "the mouth is vanilla's own red -- lips, not skin and not clothing")
+  eq(px and hex(px[10][3]), "65ba3f",
     "the collar is still green -- black either side, not skin")
   eq(px and hex(px[2][3]), "65ba3f",
-    "the bill goes with the hat -- shade 2, but directly under the cap")
-  eq(px and hex(px[4][3]), "f0a363",
-    "the face is still skin -- black above it, not cap")
-  eq(px and hex(px[5][3]), "000000", "an eye stays black")
+    "the bill under the cap goes with the hat (facing down)")
+  eq(px and hex(px[3][1]), "65ba3f",
+    "the bill beside the cap goes with the hat too (facing sideways)")
+  eq(px and hex(px[7][3]), "f0a363",
+    "the face is still skin -- below the cap rows, so the bill rule skips it")
+  eq(px and hex(px[11][3]), "f0a363",
+    "...and so is the face deeper in the frame")
+  eq(px and hex(px[8][3]), "000000", "an eye stays black")
 end
 
 io.write("transforms.lua -- the bill rule is overworld-only\n")
@@ -163,7 +180,7 @@ do
   local px = ctx.written["green/trainer_card/red.png"].out
   eq(hex(px[2][3]), "f0a363",
     "shade 2 under the cap stays skin on the trainer card")
-  eq(hex(px[6][4]), "f0a363", "...and the mouth rule still applies there")
+  eq(hex(px[9][4]), "ec4d29", "...and the mouth rule still applies there")
 end
 
 io.write("transforms.lua\n")
