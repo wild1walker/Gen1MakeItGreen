@@ -2,6 +2,29 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.15.0] - 2026-08-28
+
+### Fixed
+
+- **The title figure flashed back to the red bake.** Asserting it from
+  `TitleState.currentSprite` is not enough: the draw reads `self.player`
+  into a local at the top and only calls `currentSprite` further down, so a
+  frame that changes the figure inside `currentSprite` still draws the
+  picture captured before the change. One frame late would be invisible if
+  the value were stable — and it is not, because the same draw skips
+  `currentSprite` altogether while `scrollPhase` is `"ball"`. For that whole
+  phase nothing re-asserted the figure and Crystal's red bake was what
+  stood, which is the flash.
+
+  `TitleState.draw` is wrapped too now, and asserts the figure before the
+  draw reads it. No true-colour mark from that path — the rect is marked
+  from `currentSprite`, inside the pass that owns those marks.
+
+- The derived copy no longer waits on the untouched art. It is a file, found
+  from the path `TitleState` loaded, and needs none — only the flat bake
+  does. Requiring it up front is why the first draw of a visit had nothing
+  to show.
+
 ## [1.14.0] - 2026-08-28
 
 ### Changed

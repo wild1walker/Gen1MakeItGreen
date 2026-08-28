@@ -771,6 +771,10 @@ end
 -- `lazy` is the art the inner link loads for itself, the way a screen that
 -- builds its own picture inside currentSprite would -- there is nothing to
 -- capture on the way in then, and the fallback is what has to find it.
+local function inner_kind(image)
+  return type(image) == "table" and image.kind or tostring(image)
+end
+
 local function titleScreen(options, mode, lazy, cache)
   cache = cache or {}
   local marks = {}
@@ -780,8 +784,18 @@ local function titleScreen(options, mode, lazy, cache)
       marks[#marks + 1] = { x = x, y = y, w = w, h = h }
     end,
   }
-  local inner = { calls = 0 }
+  local inner = { calls = 0, draws = 0 }
   local TitleState = {}
+  -- the real draw takes `local playerImage = self.player` at the top and
+  -- only calls currentSprite further down -- and not at all in one phase.
+  -- The stub is that shape, so a fix that only touches currentSprite fails.
+  function TitleState:draw()
+    inner.draws = inner.draws + 1
+    inner.drew = self.player
+    -- the stub's title tables are plain, so reach the wrapper by name the
+    -- way the engine reaches it through TitleState's metatable
+    if not self.skipSprite then TitleState.currentSprite(self) end
+  end
   -- Crystal's link: under redpp it replaces the art with its own red bake
   -- and flags it, and out of redpp it puts the untouched art back.
   function TitleState:currentSprite()
@@ -985,6 +999,30 @@ do
   eq(t3.player and t3.player.kind, "baked",
     "with no derived copy, the bake still runs")
   eq(hex(t3.player.data.out[1][3]), "65ba3f", "...and it is still green")
+end
+
+io.write("main.lua -- the figure is asserted before the draw reads it\n")
+do
+  -- TitleState:draw captures self.player at the top and calls currentSprite
+  -- below it -- and skips currentSprite entirely for one phase of the title
+  -- animation.  Asserting the figure only from currentSprite therefore draws
+  -- the previous picture, and for that whole phase draws Crystal's red bake.
+  local have = { ["assets/generated/greenskin/title/player.png"] = true }
+  local screen = titleScreen({ player = "green", ribbon = true }, "redpp", nil, have)
+  local title = { player = screen.raw,
+                  playerPath = "assets/generated/title/player.png" }
+
+  screen.TitleState.draw(title)
+  eq(inner_kind(screen.inner.drew), "derived",
+    "the very first draw already has the green figure, not the one before it")
+
+  -- and the phase that never calls currentSprite at all
+  title.skipSprite = true
+  local before = screen.inner.calls
+  screen.TitleState.draw(title)
+  eq(screen.inner.calls, before, "this phase really does skip currentSprite")
+  eq(inner_kind(screen.inner.drew), "derived",
+    "...and the figure is still green through it")
 end
 
 io.write("main.lua -- the title figure out of REDPP\n")

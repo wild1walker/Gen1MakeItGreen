@@ -478,17 +478,20 @@ return function(mod)
     -- twice costs nothing.
     local FIGURE_X, FIGURE_Y = 82, 80
 
-    local function apply(title)
-      local raw = title.__wildGreenRaw
-      if not raw then
-        -- the art was not there on the way in, which happens if the screen
-        -- loads it inside currentSprite.  Crystal captured the same
-        -- untouched picture before baking over it; take that rather than
-        -- the bake that is on screen now.
-        raw = title.__crystalPlayerRaw
-        if not raw then return end
-        title.__wildGreenRaw = raw
-      end
+    -- the untouched art, for the bake.  The DERIVED copy needs none of
+    -- this -- it is a file, found from the path TitleState loaded -- so the
+    -- search only happens when the bake is what is left.
+    local function rawOf(title)
+      if title.__wildGreenRaw then return title.__wildGreenRaw end
+      local raw = title.__crystalPlayerRaw
+      -- and failing that, what is on the instance right now, but only while
+      -- nothing has baked over it yet
+      if not raw and not title.__crystalTrainerBaked then raw = title.player end
+      title.__wildGreenRaw = raw
+      return raw
+    end
+
+    local function apply(title, mark)
       if PaletteFX.mode == "redpp" then
         if title.__wildGreenBaked == nil then
           -- the recipe's copy first: it is the whole figure, skin and all.
@@ -497,6 +500,8 @@ return function(mod)
           local how = "the recipe's green copy"
           title.__wildGreenBaked = derived(title)
           if not title.__wildGreenBaked then
+            local raw = rawOf(title)
+            if not raw then return end          -- nothing to work from yet
             how = "a flat bake -- no derived copy of " ..
               tostring(title.playerPath)
             title.__wildGreenBaked = greenBake(raw) or false
@@ -516,9 +521,9 @@ return function(mod)
         -- path -- a switch out of REDPP -- then puts back the same picture
         -- we captured, which is where the branch below leaves it too, so the
         -- two agree about the figure in both directions.
-        title.__crystalPlayerRaw = title.__crystalPlayerRaw or raw
+        title.__crystalPlayerRaw = title.__crystalPlayerRaw or title.__wildGreenRaw
         title.__crystalTrainerBaked = true
-        if type(PaletteFX.markTrueColor) == "function" then
+        if mark and type(PaletteFX.markTrueColor) == "function" then
           local okDim, w, h = pcall(baked.getDimensions, baked)
           if okDim and w and h then
             pcall(PaletteFX.markTrueColor, FIGURE_X, FIGURE_Y, w, h)
@@ -528,7 +533,10 @@ return function(mod)
         -- out of REDPP the zone pass runs again and MEWMON is what colours
         -- him, so the grey art goes back: baked green through the zone pass
         -- would be painted twice.
-        if title.player == title.__wildGreenBaked then title.player = raw end
+        local raw = title.__wildGreenRaw or title.__crystalPlayerRaw
+        if raw and title.player == title.__wildGreenBaked then
+          title.player = raw
+        end
         title.__wildGreenBaked = nil
         title.__crystalTrainerBaked = nil
       end
@@ -543,8 +551,31 @@ return function(mod)
         self.__wildGreenRaw = self.player
       end
       local image, trueColor = inner(self, ...)
-      pcall(apply, self)
+      pcall(apply, self, true)
       return image, trueColor
+    end
+
+    -- ------- and again from draw(), because currentSprite is not enough
+    --
+    -- TitleState:draw takes `local playerImage = self.player` at the TOP and
+    -- only calls currentSprite further down -- so a frame that changes
+    -- self.player inside currentSprite still draws the picture it captured
+    -- before the change.  One frame late is invisible while the value is
+    -- stable, and this one is not stable: the same draw skips currentSprite
+    -- entirely while scrollPhase is "ball", so for a whole phase of the
+    -- title's animation nothing re-asserts the figure and Crystal's red bake
+    -- is what stands.  That is the flash back to the old skin.
+    --
+    -- So assert it here too, before the draw reads it.  No true-colour mark
+    -- from this path: the rect is marked from currentSprite, inside the pass
+    -- that owns those marks, and marking again mid-draw is not this mod's
+    -- business.
+    local innerDraw = TitleState.draw
+    if type(innerDraw) == "function" then
+      function TitleState:draw(...)
+        pcall(apply, self, false)
+        return innerDraw(self, ...)
+      end
     end
     return "wrapped"
   end

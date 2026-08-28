@@ -47,7 +47,10 @@ own ledger stays "None currently"; these are this mod's divergences.
   the pinned mod marks his rectangle true-colour there and bakes his grey art
   to Red's own white / skin / red / navy. This mod wraps
   `TitleState.currentSprite` outside that wrapper — it is priority 1300 and
-  loads last — and hands the draw the recipe's own copy of
+  loads last — **and `TitleState.draw` as well**, because the draw reads
+  `self.player` into a local before it calls `currentSprite`, and skips
+  `currentSprite` entirely for one phase of the title's animation. It hands
+  the draw the recipe's own copy of
   `assets/generated/title/player.png`, which carries the same face, ear and
   hands the trainer card gets. `TitleState` keeps the path it loaded him
   from, so the twin is derived from that rather than guessed, and
