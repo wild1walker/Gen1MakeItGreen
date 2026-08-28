@@ -2,6 +2,47 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.23.0] - 2026-08-28
+
+### Fixed
+
+- **A table only ever found its art where it sat.** Both painted pictures —
+  the title figure and the battle back pic — are lists of coordinates, so a
+  cache holding the SAME sprite one pixel over failed every guard at once and
+  the picture fell through to the flat ramp. An importer that pads
+  differently, a rip on a larger sheet, a canvas that is not 32×32: all of it
+  read as "this is not the art I was drawn against" when the pixels were
+  identical.
+
+  A table is now matched at its own coordinates first — so art that worked
+  before works byte for byte, and the offset is only ever a second attempt —
+  and if that fails it is slid over the picture to find the offset it does
+  fit at. Verified against the real back pic shifted by +1,+1 and +5,+3, and
+  padded into 48×48 and 64×56 canvases: all 33 pixels land correctly in every
+  one, and the picture where it was authored is unchanged.
+
+  It cannot wander into painting something else. A run still has to clear
+  `TABLE_MIN`, which on the back pic means 30 of 33 entries landing on the
+  right shade across three different shades in one fixed arrangement — no
+  flat region can do that, whatever it is made of. And the best offset has to
+  be the **only** best one: two offsets reading equally well is an ambiguous
+  picture, and an ambiguous picture is left alone rather than painted at
+  whichever came first.
+
+### Notes
+
+- What is still out of reach is art whose **pixels** differ, and that is on
+  purpose. There is no rule underneath the back pic's table to fall back to,
+  and this is not for want of trying: read off the real art, the hand cannot
+  be told from the sleeve's own white by size, by height, or by reaching past
+  the body, because the sleeve does all three — six of the nine enclosed
+  white regions reach past the torso, and the one beside the hand is the same
+  size and sits in the same rows. The neck is worse: its skin is three
+  patches of 6, 2 and 1 pixels, while thirteen *other* single-pixel patches
+  of the same shade must stay green. A rule tuned tight enough to separate
+  those would *be* the table, and would fail **open** on art it has never
+  seen instead of leaving it alone. Failing closed is the feature.
+
 ## [1.22.0] - 2026-08-28
 
 ### Fixed

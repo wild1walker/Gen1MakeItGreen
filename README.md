@@ -241,6 +241,24 @@ against, and a cache whose figure differs — a translation, a conversion, a
 different rip — fails those checks and falls through to the ordinary rules
 rather than being painted at coordinates that mean nothing there.
 
+A table is matched at its own coordinates first, and only if that fails is it
+slid over the picture to find the offset it *does* fit at. A list of
+coordinates otherwise finds its art only where it sat, so the same sprite one
+pixel over — an importer that pads differently, a rip on a larger sheet, a
+canvas that is not 32×32 — failed every guard at once when the pixels were
+identical. Placement is the one thing that varies without the art changing.
+It cannot wander: a run still has to clear the same threshold, and the best
+offset has to be the only best one, because two equal readings are not a
+reading.
+
+Art whose **pixels** differ is still left alone, on purpose, and there is no
+rule underneath to fall back to. On the back pic the hand cannot be told from
+the sleeve's own white by size, by height, or by reaching past the body — the
+sleeve does all three — and the neck's skin is three patches of 6, 2 and 1
+pixels against thirteen single-pixel patches of the same shade that must stay
+green. A rule tuned tight enough to separate those would *be* the table, and
+would fail open on art it has never seen.
+
 The **Poké Ball** is not in the table. The engine lifts an 8×8 out of that
 file at `(0,16)` and throws it on a y of its own while the title animates,
 so in a screenshot it is never where it lives — but the rect is an engine
