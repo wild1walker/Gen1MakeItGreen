@@ -45,19 +45,18 @@ own ledger stays "None currently"; these are this mod's divergences.
   Animated Sprites off and `ADVANCED` still gets the green bake; turn
   `TITLE FIGURE` off and neither happens.
 
-- **`PORTRAIT SKIN` finds the skin by where it sits, not by its shade.**
-  Vanilla's ramp on the trainer art is monochrome, so shade 2 is the face,
-  both hands, the shading inside the cap, the jacket's shoulder and the
-  dither on the knees, all at once — and on the real art a hand and a
-  shoulder highlight are one pixel apart on size, white, outfit and ink
-  alike. The face is the biggest patch high in the figure with paper against
-  it (the cap's shading is sealed inside the cap and has none); the hands are
-  the patches beside the lower half of the torso (the shoulder is above its
-  middle); small pieces of shade 3 sealed inside skin take the skin's own
-  shadow, so the ear and the brow are not green freckles. No face found and
-  nothing is painted at all — the battle back pic is that case. The title
-  screen's standing figure is baked at draw time rather than read from a
-  file, so it keeps the flat green either way.
+- **`PORTRAIT SKIN` reaches two shades, because skin is drawn in two.** The
+  face is shade 2 with its brow in shade 3; the hands are shade 3 alone, the
+  same shade as the trousers and the cap; the ear is one pixel of each.
+  Nothing is decided by size or colour — the face is the biggest patch of
+  shade 2 high in the figure with paper against it, the ear is a speck beside
+  its upper half, and the hands are small patches of shade 3 reaching past
+  the shirt's edge at hip height and ringed by outline. The cap's shading,
+  the jacket's shoulder and sleeves, the collar and the shirt's hem each fail
+  one of those and stay green. No face found and nothing is painted at all —
+  the battle back pic is that case. The title screen's standing figure is
+  baked at draw time rather than read from a file, so it keeps the flat green
+  either way.
 
 - **The green band is a registry record only under SGB.** `PaletteFX.pal`
   (`src/render/PaletteFX.lua`) short-circuits every named palette to the

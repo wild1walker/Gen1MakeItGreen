@@ -2,6 +2,34 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.9.0] - 2026-08-28
+
+### Fixed
+
+- **The hands and the ear are skin, and the sleeves are not.** Skin on this
+  art is not one shade: the face is shade 2 with its brow in shade 3, the
+  **hands are shade 3 alone** — the same shade as the trousers and the cap —
+  and the ear is one pixel of each. Every rule up to 1.8.0 only ever looked
+  at shade 2, so the hands and the ear could not be reached by any of them,
+  and the patches those rules did find on the arms were the jacket's own
+  sleeve shading.
+
+  Nothing here is decided by size or colour now. The face is the biggest
+  patch of shade 2 high in the figure with paper against it; the ear is a
+  speck of shade 2 beside its upper half; the hands are small patches of
+  shade 3 reaching past the shirt's edge, low enough to be at the hip, and
+  ringed by outline. The three things that look exactly like a hand each
+  fail one clause: the collar is too high, the shirt's hem has no outline
+  round it, and a hole in the shirt is not past its edge.
+
+### Notes
+
+- Checked against the card's real shade map, region by region: face, ear and
+  both hands skin; cap shading, jacket shoulder, sleeves, collar, hem,
+  trousers and shoes green.
+- All seven clauses are load-bearing — breaking any one of them fails the
+  suite. The fixture carries a decoy for each.
+
 ## [1.8.0] - 2026-08-28
 
 ### Fixed

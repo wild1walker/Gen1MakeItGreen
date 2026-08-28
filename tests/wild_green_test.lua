@@ -196,43 +196,35 @@ end
 
 io.write("transforms.lua -- which parts of a portrait are skin\n")
 do
-  -- Vanilla's ramp on this art is monochrome, so a pixel's shade never says
-  -- whether it is a cheek or a sleeve.  Read back out of the game, the real
-  -- card's shade 2 is at least five different things, and two of them --
-  -- the jacket's shoulder highlight and a hand -- are one pixel apart on
-  -- every local count there is.  Only where they sit tells them apart, so
-  -- the fixture is built to that shape:
-  --
-  --   the cap's shading is BIGGER than the face, and sealed inside the cap;
-  --   the jacket's shoulder is beside the torso but above its middle;
-  --   the hands are beside the torso's lower half;
-  --   a piece of shade 3 sits inside the face;
-  --   and dither sits beside the torso at hand height.
+  -- Skin is not one shade here.  The face is shade 2 with its brow in shade
+  -- 3; the HANDS are shade 3 alone -- the same shade as the trousers and the
+  -- cap -- and the ear is one pixel of each.  The fixture carries all four
+  -- of those and all four of the things that look like them and are not.
   local PORTRAIT = {
     { W, W, K, K, K, K, K, K, W, W, W, W, W, W },  -- 0
     { W, K, O, S, S, S, S, O, K, W, W, W, W, W },  -- 1  the cap's shading:
     { W, K, O, S, S, S, S, O, K, W, W, W, W, W },  -- 2  12px, sealed, and
-    { W, K, O, S, S, S, S, O, K, W, W, W, W, W },  -- 3  bigger than the face
+    { W, K, O, S, S, S, S, O, K, W, W, W, W, W },  -- 3  BIGGER than the face
     { W, W, K, K, K, K, K, K, W, W, W, W, W, W },  -- 4
-    { W, W, W, S, S, S, S, W, W, W, W, W, W, W },  -- 5  the face: 11px, and
-    { W, W, K, S, S, S, S, K, W, W, W, W, W, W },  -- 6  paper against it
-    { W, W, K, S, O, S, S, K, W, W, W, W, W, W },  -- 7  with a detail in it
+    { W, W, W, S, W, S, S, S, W, W, W, W, W, W },  -- 5  a speck INSIDE the
+    { W, W, K, K, S, S, S, S, K, W, S, W, W, W },  -- 6  face's columns, the
+    { W, W, K, S, S, O, S, S, K, W, O, W, W, W },  -- 7  face, and the EAR
     { W, W, K, K, K, K, K, K, W, W, W, W, W, W },  -- 8
     { W, W, W, W, W, W, W, W, W, W, W, W, W, W },  -- 9
     { W, S, S, S, W, W, W, W, W, W, W, W, W, W },  -- 10 the jacket's
-    { W, S, S, S, W, W, W, W, W, W, W, W, W, W },  -- 11 shoulder: above the
-    { W, W, W, W, K, K, K, K, K, W, W, W, W, W },  -- 12 torso's middle
-    { W, W, W, W, K, K, K, K, K, W, W, W, W, W },  -- 13
-    { W, W, W, W, K, K, K, K, K, W, W, W, W, W },  -- 14
-    { W, W, W, W, K, K, K, K, K, W, W, W, W, W },  -- 15
-    { W, W, W, W, K, K, K, K, K, W, W, W, W, W },  -- 16
-    { W, S, S, W, K, K, K, K, K, W, S, S, W, W },  -- 17 the hands, beside
-    { W, S, S, W, K, K, K, K, K, W, S, S, W, W },  -- 18 the torso's lower
-    { W, S, S, W, K, K, K, K, K, W, S, S, W, W },  -- 19 half
-    { W, W, W, W, K, K, K, K, K, W, W, W, W, W },  -- 20
-    { W, W, W, W, W, W, W, W, W, W, W, W, W, W },  -- 21
-    { W, W, S, O, S, O, S, W, W, W, W, W, W, W },  -- 22 dither at hand
-    { W, W, O, S, O, S, O, W, W, W, W, W, W, W },  -- 23 height, beside it
+    { W, S, S, S, W, W, W, W, S, W, W, W, W, W },  -- 11 shoulder, and a
+    { W, W, W, W, K, K, K, K, K, W, W, W, W, W },  -- 12 speck beside the
+    { W, K, O, O, K, K, K, K, K, W, W, W, W, W },  -- 13 face but too LOW.
+    { W, K, O, O, K, K, K, K, K, W, S, S, W, W },  -- 14 Then the collar:
+    { W, W, S, S, W, K, K, K, K, W, S, S, W, W },  -- 15 hand-shaped, ringed
+    { W, W, W, W, K, K, K, K, K, W, W, W, W, W },  -- 16 by ink, past the
+    { W, W, W, W, K, K, K, K, K, W, W, W, W, W },  -- 17 shirt -- but ABOVE
+    { W, K, O, O, K, K, O, O, K, K, O, O, K, W },  -- 18 the waist.  The
+    { W, K, O, O, K, K, O, O, K, K, O, O, K, W },  -- 19 HANDS, and a hole
+    { W, W, W, W, K, K, K, K, K, W, W, W, W, W },  -- 20 in the shirt that
+    { W, W, W, W, W, W, W, W, W, W, W, W, W, W },  -- 21 is not past its edge
+    { W, W, W, O, O, O, O, W, W, W, W, W, W, W },  -- 22 the hem: no ink
+    { W, W, W, W, W, W, W, W, W, W, W, W, W, W },  -- 23
   }
 
   local ctx = fakeCtx({ ["trainer_card/red.png"] = PORTRAIT })
@@ -240,50 +232,56 @@ do
   local plain = ctx.written["green/trainer_card/red.png"]
   local skin = ctx.written["greenskin/trainer_card/red.png"]
   ok(plain ~= nil and skin ~= nil, "both copies of the portrait are written")
+  eq(hex(plain.out[7][6]), "a8dd8a", "green/ leaves the face the light green")
+  eq(hex(plain.out[19][3]), "65ba3f", "...and the hands the outfit green")
 
-  eq(hex(plain.out[6][4]), "a8dd8a", "green/ leaves the face the light green")
-  eq(hex(plain.out[18][2]), "a8dd8a", "...and the hands with it")
+  -- the face, and the shadow in it
+  eq(hex(skin.out[6][6]), "f0a363", "the face is skin")
+  eq(hex(skin.out[8][7]), "f0a363", "...all of it")
+  eq(hex(skin.out[8][6]), "ad7547", "the brow inside it is the skin's shadow")
 
-  -- the face, and the shadow inside it
-  eq(hex(skin.out[6][4]), "f0a363", "the face is skin")
-  eq(hex(skin.out[8][6]), "f0a363", "...all of it")
-  eq(hex(skin.out[8][5]), "ad7547",
-    "a piece of shade 3 sealed inside the face is the skin's own shadow --")
-  ok(hex(skin.out[8][5]) ~= "65ba3f",
-    "...not a green freckle on a skin-coloured face")
+  -- the ear: one pixel of each shade, beside the UPPER half of the face
+  eq(hex(skin.out[7][11]), "f0a363", "the ear is skin")
+  eq(hex(skin.out[8][11]), "ad7547", "...and the pixel under it is its shadow")
+  eq(hex(skin.out[6][4]), "a8dd8a",
+    "a speck inside the face's own columns is not an ear")
+  eq(hex(skin.out[12][9]), "a8dd8a",
+    "...and neither is one beside it but down at the chest")
 
-  -- the hands
-  eq(hex(skin.out[18][2]), "f0a363", "a hand beside the torso's lower half")
+  -- the hands, which are shade 3 and were unreachable before 1.9.0
+  eq(hex(skin.out[19][3]), "f0a363", "a hand is skin, out of the mid shade")
   eq(hex(skin.out[20][11]), "f0a363", "...on both sides")
 
-  -- and everything that is NOT skin
+  -- and everything that looks like skin and is not
   eq(hex(skin.out[3][5]), "a8dd8a",
     "the cap's shading stays green: bigger than the face, but sealed in")
-  eq(hex(skin.out[11][2]), "a8dd8a",
-    "the jacket's shoulder stays green: beside the torso, but above its middle")
-  eq(hex(skin.out[12][4]), "a8dd8a", "...all of it")
-  eq(hex(skin.out[23][3]), "a8dd8a",
-    "dither beside the torso stays green: one pixel is not a hand")
-  eq(hex(skin.out[24][4]), "a8dd8a", "...on either row of it")
+  eq(hex(skin.out[11][2]), "a8dd8a", "the jacket's shoulder stays green")
+  eq(hex(skin.out[16][11]), "a8dd8a",
+    "the sleeve's shading stays green -- this is what 1.8.0 read as a hand")
+  eq(hex(skin.out[14][3]), "65ba3f",
+    "the collar stays green: hand-shaped and ringed by ink, but too high")
+  eq(hex(skin.out[19][7]), "65ba3f",
+    "a hole in the shirt stays green: not past its edge")
+  eq(hex(skin.out[23][4]), "65ba3f",
+    "the hem stays green: past the edge, but no outline round it")
   eq(hex(skin.out[2][3]), "65ba3f", "the cap itself is the outfit green")
-  eq(hex(skin.out[13][5]), "000000", "the torso is still ink")
-  eq(hex(skin.out[6][1]), "ffffff", "the ground is still paper")
+  eq(hex(skin.out[13][6]), "000000", "the shirt front is still ink")
+  eq(hex(skin.out[7][1]), "ffffff", "the ground is still paper")
 end
 
 io.write("transforms.lua -- no face, no skin anywhere\n")
 do
-  -- The battle BACK pic: there is no face on the back of his head, so
-  -- nothing is painted at all and the picture is the flat green.  Same for
-  -- any portrait this rule does not fit.
+  -- The battle BACK pic: no face on the back of his head, so nothing is
+  -- painted at all -- not even something shaped like a hand.
   local NO_FACE = {
     { W, W, K, K, K, K, K, K, W, W, W, W, W, W },
-    { W, K, O, S, S, S, S, O, K, W, W, W, W, W },  -- sealed shading only
+    { W, K, O, S, S, S, S, O, K, W, W, W, W, W },
     { W, K, O, S, S, S, S, O, K, W, W, W, W, W },
     { W, W, K, K, K, K, K, K, W, W, W, W, W, W },
     { W, W, W, W, K, K, K, K, K, W, W, W, W, W },
-    { W, S, S, W, K, K, K, K, K, W, S, S, W, W },  -- and patches that would
-    { W, S, S, W, K, K, K, K, K, W, S, S, W, W },  -- be hands, if there were
-    { W, S, S, W, K, K, K, K, K, W, S, S, W, W },  -- a face to go with them
+    { W, W, W, W, K, K, K, K, K, W, W, W, W, W },
+    { W, K, O, O, K, K, K, K, K, K, O, O, K, W },
+    { W, K, O, O, K, K, K, K, K, K, O, O, K, W },
     { W, W, W, W, K, K, K, K, K, W, W, W, W, W },
   }
   local ctx = fakeCtx({ ["battle/redb.png"] = NO_FACE })
@@ -291,8 +289,8 @@ do
   local skin = ctx.written["greenskin/battle/redb.png"]
   ok(skin ~= nil, "the skinned copy is still written")
   eq(hex(skin.out[2][5]), "a8dd8a", "the sealed shading is not a face")
-  eq(hex(skin.out[7][2]), "a8dd8a",
-    "and with no face found, nothing else is painted either")
+  eq(hex(skin.out[7][3]), "65ba3f",
+    "and with no face found, a hand-shaped patch is left alone too")
 end
 
 io.write("transforms.lua -- every picture is covered\n")

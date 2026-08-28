@@ -136,45 +136,55 @@ blotches on the hat and the knees. The portrait gets the same trick in green,
 and neither of the overworld position rules, because a face-sized rule on
 face-sized art is noise.
 
-### Finding the skin by where it sits
+### Finding the skin when skin is not one shade
 
 Vanilla's ramp on this art is monochrome, so a pixel's shade never says
-whether it is a cheek or a sleeve. Read back out of the game, the card's
-shade 2 is 128 pixels in 43 pieces and at least five different things: the
-face, both hands, the shading inside the cap, the jacket's shoulder
-highlight, and dither on the knees and shoes.
+whether it is a cheek or a sleeve — and skin is not one shade anyway. The
+face is shade 2 with its brow and mouth in shade 3, and the **hands are
+shade 3 alone**, the same shade as the trousers and the cap. Every rule
+before 1.9.0 looked only at shade 2, so the hands and the ear were
+unreachable by all of them, and what those rules did find on the arms was
+the jacket's own shading.
 
-It cannot be done by size or by how much white is against a patch. Measured
-on the real art:
+Read back out of the game, the card's four skin parts are:
 
-| | size | white | outfit | ink |
-|---|---|---|---|---|
-| jacket shoulder | 8 | 3 | 6 | 7 |
-| left hand | 5 | 3 | 5 | 4 |
+| | |
+|---|---|
+| the face | one patch of shade 2, 22px, high in the figure |
+| the ear | **one** pixel of shade 2 beside it, with one of shade 3 under it |
+| the hands | two patches of **shade 3** — 6px at the left hip, 7px at the right |
+| the detail | small pieces of shade 3 inside or against skin: brow, mouth, the ear's shadow |
 
-One pixel apart on every count — any threshold that keeps the hand takes the
-shoulder with it. What separates them is **where they sit**:
+and the four things that look like them and are not: the cap's shading
+(19px of shade 2, sealed inside the cap), the jacket's shoulder and sleeve
+shading (shade 2, and one pixel from a hand on every local count), the
+collar (6px of shade 3 — a hand's size and a hand's profile), and the
+shirt's hem (4px of shade 3, out past the shirt's edge like a hand).
 
-- **The face** is the biggest patch of shade 2 high in the figure that has
-  paper against it. The cap's own shading is a solid patch up there too, and
-  bigger than either hand, but it is sealed inside the cap and touches no
-  paper at all. That is the one thing that tells the two apart.
-- **The hands** are the patches beside the *lower half* of the torso — the
-  biggest mass of ink in the picture, which is his shirt front. The jacket's
-  shoulder is beside the torso too, but above its middle, so it stays with
-  the jacket.
-- **The detail** is small pieces of shade 3 sealed inside skin: the ear, the
-  brow, the line of the mouth. Vanilla draws those in the shade below the
-  skin's own, so painting only shade 2 leaves green freckles on an otherwise
-  skin-coloured face. They take `#ad7547`, the skin's own shadow — which is
-  why there are two skin colours rather than one.
+So nothing is decided by size or colour alone. Every rule is about **where**
+a patch sits relative to the figure and to the biggest mass of ink in it,
+which is his shirt front:
 
-It still fails closed: no face found, and nothing is painted anywhere. The
-battle back pic is that case — there is no face on the back of his head — and
-so is any portrait the rule does not fit.
+- **The face** — the biggest patch of shade 2 high in the figure with paper
+  against it. The cap's shading is bigger and sits up there too, but it is
+  sealed inside the cap and touches no paper at all.
+- **The ear** — a speck of shade 2 *beside* the face, level with its upper
+  half. Beside, because inside is the face already; upper half, because that
+  is where an ear is and the collar is not.
+- **The hands** — small patches of shade 3 reaching *past* the shirt's edge,
+  low enough to be at the hip rather than the shoulder, and ringed by
+  outline. The collar fails the height; the hem fails the outline; a hole in
+  the shirt fails the edge.
+- **The detail** — shade 3 sealed inside skin, or a speck of it against
+  skin. Those take `#ad7547`, the skin's own shadow, so the brow and the
+  ear are not green freckles on a skin-coloured face.
 
-Run against the real card art, every one of the ten labelled regions comes
-out right: face and both hands skin, cap and jacket and brim and shoes green.
+It still fails closed: no face found, nothing is painted anywhere — not even
+something shaped like a hand. The battle back pic is that case.
+
+Checked against the real card region by region: face, ear and both hands
+come out skin; cap shading, jacket shoulder, sleeves, collar, hem, trousers
+and shoes stay green.
 
 The recipe writes **both** copies of every portrait — `green/` and
 `greenskin/` — and the row picks between two files that already exist, rather

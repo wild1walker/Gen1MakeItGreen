@@ -180,54 +180,47 @@ return function(ctx)
 
   -- ------- which parts of a portrait are skin
   --
-  -- Vanilla's ramp on this art is monochrome red -- white, light red, red,
-  -- black -- so nothing about a pixel's SHADE says whether it is a cheek or
-  -- a sleeve.  Read back out of the game, the card's shade 2 is 128 pixels
-  -- in 43 pieces, and it is at least five different things: the face, both
-  -- hands, the shading inside the cap, the highlight on the jacket's
-  -- shoulder, and checkerboard dither on the knees and the shoes.
+  -- Vanilla's ramp on this art is monochrome, so a pixel's SHADE never says
+  -- whether it is a cheek or a sleeve.  Worse, skin is not one shade: the
+  -- face is drawn in shade 2 with its brow and mouth in shade 3, and the
+  -- HANDS are drawn in shade 3 alone -- the same shade as the trousers and
+  -- the cap.  Every rule up to 1.8.0 only ever looked at shade 2, so the
+  -- hands and the ear were never reachable by any of them, and what it did
+  -- reach on the arms was the jacket's own shading.
   --
-  -- 1.7.0 tried to separate them by size and by how much white was against
-  -- them, and it cannot be done that way.  Measured on the real art:
+  -- Read back out of the game, the card's four skin parts are:
   --
-  --     region        size  white  outfit  ink
-  --     jacket            8      3       6     7
-  --     left hand         5      3       5     4
+  --   the FACE   one patch of shade 2, 22px, high in the figure.
+  --   the EAR    ONE pixel of shade 2 beside it, with one of shade 3 under
+  --              it.  Not in any patch big enough to have a rule of its own.
+  --   the HANDS  two patches of SHADE 3 -- 6px at the left hip, 7px at the
+  --              right -- sitting past the edge of the shirt.
+  --   the DETAIL small pieces of shade 3 inside or against skin: the brow,
+  --              the mouth, the ear's own shadow.
   --
-  -- One pixel apart on every count.  Any threshold that keeps the hand
-  -- takes the shoulder with it, which is exactly what shipped.
+  -- and the four things that look like them and are not:
   --
-  -- What DOES separate them is where they sit relative to the figure, so
-  -- that is what this asks about:
+  --   the cap's shading (19px of shade 2, sealed inside the cap);
+  --   the jacket's shoulder and its sleeve shading (shade 2, and on the real
+  --     art one pixel away from a hand on every local count there is);
+  --   the collar (6px of shade 3, the same size and profile as a hand);
+  --   the shirt's hem (4px of shade 3 past the shirt's edge).
   --
-  --   the FACE    the biggest patch of shade 2 high in the figure that has
-  --               paper against it.  The cap's own shading is a solid patch
-  --               up there too -- bigger than either hand -- but it is
-  --               sealed inside the cap and touches no paper at all, which
-  --               is the one thing that tells the two apart.
-  --   the HANDS   the patches beside the lower half of the torso -- the
-  --               biggest mass of ink in the picture, which is his shirt
-  --               front.  The jacket's shoulder is beside the torso too,
-  --               but ABOVE its middle, so it stays with the jacket.
-  --   the DETAIL  small pieces of shade 3 sealed inside skin: the ear, the
-  --               brow, the line of the mouth.  Vanilla draws those in the
-  --               shade below, so painting only shade 2 leaves green
-  --               freckles on an otherwise skin-coloured face.
-  --
-  -- The last one is why there are two skin colours.  Shade 2 is the light
-  -- on the skin and shade 3 is its shadow; a face needs both.
-  --
-  -- Still fails closed: no face found, nothing is painted anywhere and the
-  -- picture is the flat green.  The battle BACK pic is that case -- there is
-  -- no face on the back of his head -- and so is any portrait this rule does
-  -- not fit.
+  -- So nothing here is decided by size or by colour alone.  Every rule is
+  -- about WHERE a patch sits relative to the figure and to the biggest mass
+  -- of ink in it, which is his shirt front.
   local FACE_BAND = 0.40   -- how far down the figure a face may begin
   local FACE_PAPER = 2     -- paper against it; a garment's shading has none
-  local HAND_MIN = 3       -- smaller than this beside the torso is dither
-  local HAND_REACH = 2     -- rows past the torso a hand may still reach
-  local DETAIL_MAX = 6     -- an ear or a brow, never a garment
+  local EAR_MAX = 2        -- an ear is a speck, not a patch
+  local EAR_NEAR = 4       -- and it is right beside the face
+  local HAND_MIN = 4       -- smaller than this out there is dither
+  local HAND_MAX = 8       -- bigger is the trouser leg
+  local HAND_INK = 4       -- outline around it: a hem strip has almost none
+  local HAND_REACH = 2     -- rows past the shirt a hand may still start
+  local DETAIL_MAX = 6     -- sealed inside skin: a brow, never a garment
+  local SPECK_MAX = 2      -- or a speck against it: the ear's own shadow
 
-  -- every 4-connected patch of one shade, and a grid saying which is which
+  -- every 4-connected patch of one shade
   local function connected(shade, w, h, want)
     local id, list = {}, {}
     for y = 0, h - 1 do id[y] = {} end
@@ -268,16 +261,19 @@ return function(ctx)
     return top, bottom, left, right
   end
 
-  -- paper is the ground the figure sits on, whether the import wrote it
-  -- transparent or matted it white
-  local function paperAgainst(pixels, shade, w, h)
+  -- how many neighbours of a patch are paper, or are ink
+  local function against(pixels, shade, w, h, paper)
     local n = 0
     for _, at in ipairs(pixels) do
       for _, step in ipairs(STEPS) do
         local nx, ny = at[1] + step[1], at[2] + step[2]
         if nx >= 0 and nx < w and ny >= 0 and ny < h then
           local s = shade[ny][nx]
-          if s == 0 or s == 1 then n = n + 1 end
+          if paper then
+            if s == 0 or s == 1 then n = n + 1 end
+          elseif s == 4 then
+            n = n + 1
+          end
         end
       end
     end
@@ -302,11 +298,15 @@ return function(ctx)
     local high = top + (bottom - top + 1) * FACE_BAND
 
     local light = connected(shade, w, h, 2)
+    local mid = connected(shade, w, h, 3)
 
+    -- the FACE: the biggest patch of shade 2 high in the figure with paper
+    -- against it.  The cap's own shading is bigger than either hand and sits
+    -- up there too, but it is sealed inside the cap and touches no paper.
     local face
     for _, pixels in ipairs(light) do
       local t = bounds(pixels)
-      if t <= high and paperAgainst(pixels, shade, w, h) >= FACE_PAPER
+      if t <= high and against(pixels, shade, w, h, true) >= FACE_PAPER
           and (not face or #pixels > #face) then
         face = pixels
       end
@@ -322,26 +322,55 @@ return function(ctx)
     end
     paint(face)
 
-    -- the torso: the biggest mass of ink there is
-    local torso
-    for _, pixels in ipairs(connected(shade, w, h, 4)) do
-      if not torso or #pixels > #torso then torso = pixels end
-    end
-    if torso then
-      local vtop, vbot, vleft, vright = bounds(torso)
-      local waist = (vtop + vbot) / 2
-      for _, pixels in ipairs(light) do
+    local ftop, fbot, fleft, fright = bounds(face)
+
+    -- the EAR: a speck of the same shade BESIDE the upper half of the face.
+    -- Beside, because inside is the face already and below is the collar;
+    -- upper half, because that is where an ear is and the chin is not.
+    local earBottom = ftop + math.floor((fbot - ftop + 1) / 2)
+    for _, pixels in ipairs(light) do
+      if pixels ~= face and #pixels <= EAR_MAX then
         local t, b, l, r = bounds(pixels)
-        if #pixels >= HAND_MIN and b >= waist and t <= vbot + HAND_REACH
-            and (r < vleft or l > vright) then
+        if b >= ftop - 1 and t <= earBottom
+            and (l > fright or r < fleft)
+            and l <= fright + EAR_NEAR and r >= fleft - EAR_NEAR then
           paint(pixels)
         end
       end
     end
 
+    -- the HANDS, which are shade 3 and not shade 2 at all.  The shirt front
+    -- is the biggest mass of ink there is; a hand is a small patch past its
+    -- edge, low enough to be at the hip rather than the shoulder, and ringed
+    -- by outline -- which is what the shirt's own hem, out there at the same
+    -- height and the same size, is not.
+    local torso
+    for _, pixels in ipairs(connected(shade, w, h, 4)) do
+      if not torso or #pixels > #torso then torso = pixels end
+    end
+    local isHand = {}
+    if torso then
+      local vtop, vbot, vleft, vright = bounds(torso)
+      local waist = (vtop + vbot) / 2
+      for i, pixels in ipairs(mid) do
+        local t, b, l, r = bounds(pixels)
+        if #pixels >= HAND_MIN and #pixels <= HAND_MAX
+            and b >= waist and t <= vbot + HAND_REACH
+            -- reaching PAST the shirt's edge, not merely overlapping it: a
+            -- hand at the hip still shares a column or two with the shirt
+            and (l < vleft or r > vright)
+            and against(pixels, shade, w, h, false) >= HAND_INK then
+          isHand[i] = true
+          paint(pixels)
+        end
+      end
+    end
+
+    -- the DETAIL: shade 3 sealed inside skin -- the brow, the mouth -- or a
+    -- speck of it against skin, which is the ear's own shadow.
     local detail = {}
-    for _, pixels in ipairs(connected(shade, w, h, 3)) do
-      if #pixels <= DETAIL_MAX then
+    for i, pixels in ipairs(mid) do
+      if not isHand[i] and #pixels <= DETAIL_MAX then
         local sealed, touching = true, 0
         for _, at in ipairs(pixels) do
           for _, step in ipairs(STEPS) do
@@ -359,7 +388,7 @@ return function(ctx)
             end
           end
         end
-        if sealed and touching > 0 then
+        if touching > 0 and (#pixels <= SPECK_MAX or sealed) then
           for _, at in ipairs(pixels) do
             detail[at[2]] = detail[at[2]] or {}
             detail[at[2]][at[1]] = true
