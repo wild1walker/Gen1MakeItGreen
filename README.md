@@ -95,11 +95,12 @@ cart's shell and the cart's label:
 | outfit | `#65ba3f` | the cap and clothes — the reference green |
 | ink | `#000000` | outline and hair |
 
-and one colour that is not a shade at all:
+and two colours that are not shades at all:
 
 | | | |
 |---|---|---|
 | mouth | `#ec4d29` | the lips — vanilla's own, sampled off red Red |
+| bill | `#e6f4dc` | the cap's bill — a green-tinted white |
 
 That second row is the one this mod got wrong twice. Shade 2 is not clothing;
 it is the skin. 1.0.0 recoloured shades 2 and 3 both, which turned the face
@@ -148,16 +149,40 @@ and nobody notices, but put a green cap above it and the hat reads as having
 no bill. A shade-2 pixel sitting directly under a shade-3 one is the bill,
 and it goes with the hat.
 
-*Any* of its four neighbours, not just the one above: facing down the bill
-sits under the cap, but in profile it sticks out beside it. 1.1.3 looked only
-upward, so the front frames had a green bill and the side frames a skin one,
-and the two disagreed. What keeps the face out of it is height — the cap and
-its bill live in the top rows of each 16px frame, the face begins below them.
+It is found by **region**: a small patch of the face's shade, touching the
+cap, high in its frame. All three, because any two of them catch something
+else — small-and-touching is also the hands, touching-and-high is also the
+top of the face, small-and-high is whatever else is up there.
 
-That second rule runs on the overworld sheets only, where the frames really
-are a 16px stack and the cap is a handful of pixels. On the 56×56 trainer
-card there are dozens of shade-2-touching-shade-3 adjacencies that are
-shading rather than a bill.
+And it is painted a green-tinted white rather than the cap's green. Vanilla's
+own colour reads as nothing; the cap's green merges it into the hat. This
+gives it an edge against both.
+
+The rule runs on the overworld sheets only, where the frames really are a
+16px stack and the cap is a handful of pixels. On the 56×56 trainer card
+there are dozens of small shade-2 regions touching shade 3 that are shading
+rather than a bill.
+
+### The hook has to sit at priority 940
+
+`Hooks:call` walks the chain **highest priority first**, and a link that
+returns without calling `next()` ends the chain there. [Crystal Animated
+Sprites][crystal] wraps `player.sprite` at **930** and does exactly that:
+when its `PLAYER SPRITE` option names a portrait it returns its own file and
+never calls `next()`.
+
+At the default priority of `0` this mod's link sat downstream of a chain that
+never reached it, which is why the battle back pic, the trainer card, Oak's
+intro and the Hall of Fame stayed red through every release from 1.0.0 to
+1.1.4. It wraps at **940** now, and computes the swap from the path it is
+handed rather than from what downstream answers.
+
+The cost belongs to the `PLAYER` row: on `GREEN` a portrait chosen in
+`CRYSTAL SPRITES > PLAYER SPRITE` no longer applies to the player. `RED`
+hands it back. Opponent portraits, the animated battle sprites and the shiny
+work are untouched either way — this link only ever answers for the player.
+
+[crystal]: https://github.com/distilledorion-sketch/crystal_animated_sprites_with_shiny_visuals
 
 **The title band** is lettering on white, not a sprite, so it gets its own —
 and both greens are dark enough to read as ink at 8px, which the character's

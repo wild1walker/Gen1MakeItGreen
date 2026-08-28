@@ -139,8 +139,9 @@ local FACE = {
   { K, S, K, S, K, S, K },   -- 7  eyes
   { K, S, S, O, S, S, K },   -- 8  the mouth: shade 3, skin either side
   { K, K, O, O, O, K, K },   -- 9  the collar: shade 3 bounded by black
-  { K, S, S, S, S, S, K },   -- 10 more face, deep in the frame
-  { K, K, K, K, K, K, K },   -- 11
+  { S, K, O, O, O, K, S },   -- 10 the hands: small and touching the body,
+                             --    but low in the frame, so not a bill
+  { K, S, S, S, S, S, K },   -- 11 more face, deep in the frame
   { K, K, K, K, K, K, K },   -- 12
   { K, K, K, K, K, K, K },   -- 13
   { K, K, K, K, K, K, K },   -- 14
@@ -160,14 +161,16 @@ do
     "the mouth is vanilla's own red -- lips, not skin and not clothing")
   eq(px and hex(px[10][3]), "65ba3f",
     "the collar is still green -- black either side, not skin")
-  eq(px and hex(px[2][3]), "65ba3f",
-    "the bill under the cap goes with the hat (facing down)")
-  eq(px and hex(px[3][1]), "65ba3f",
-    "the bill beside the cap goes with the hat too (facing sideways)")
+  eq(px and hex(px[2][3]), "e6f4dc",
+    "the bill under the cap is the green-tinted white (facing down)")
+  eq(px and hex(px[3][1]), "e6f4dc",
+    "the bill beside the cap is too (facing sideways)")
   eq(px and hex(px[7][3]), "f0a363",
-    "the face is still skin -- below the cap rows, so the bill rule skips it")
-  eq(px and hex(px[11][3]), "f0a363",
+    "the face is still skin -- too big a region to be a bill")
+  eq(px and hex(px[12][3]), "f0a363",
     "...and so is the face deeper in the frame")
+  eq(px and hex(px[11][1]), "f0a363",
+    "a hand is skin: small and touching the body, but low in the frame")
   eq(px and hex(px[8][3]), "000000", "an eye stays black")
 end
 
@@ -179,7 +182,7 @@ do
   chunk(MOD .. "transforms.lua")(ctx)
   local px = ctx.written["green/trainer_card/red.png"].out
   eq(hex(px[2][3]), "f0a363",
-    "shade 2 under the cap stays skin on the trainer card")
+    "shade 2 touching the cap stays skin on the trainer card")
   eq(hex(px[9][4]), "ec4d29", "...and the mouth rule still applies there")
 end
 

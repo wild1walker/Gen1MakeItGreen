@@ -21,6 +21,14 @@ own ledger stays "None currently"; these are this mod's divergences.
 
 ## Known limits
 
+- **On `PLAYER = GREEN` the player's portrait is this mod's, not Crystal
+  Animated Sprites'.** That mod wraps `player.sprite` at priority 930 and
+  short-circuits the chain; this one wraps at 940 to get in front of it, so a
+  portrait chosen in `CRYSTAL SPRITES > PLAYER SPRITE` does not reach the
+  player. `PLAYER = RED` hands it back. Nothing else of that mod's is
+  affected: opponent portraits, the animated battle sprites and the shiny
+  reveal all go through other seams.
+
 - **The title screen's standing figure stays vanilla.** `TitleState` bakes
   the OBJ palette onto it and cuts its rectangle out of the true-colour
   region so the cycling mon keeps its palette, so there is no seam to hand it

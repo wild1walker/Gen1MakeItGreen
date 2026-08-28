@@ -140,16 +140,40 @@ return function(mod)
         tostring(ctx.kind), tostring(ctx.side), tostring(path), verdict)
     end
 
+    -- ------- priority 940, and why it is not 0
+    --
+    -- Hooks:call walks the chain highest priority first, and a link that
+    -- returns without calling next() ends it there (src/mods/Hooks.lua).
+    -- Crystal Animated Sprites -- which this cart pins -- wraps player.sprite
+    -- at 930 and does exactly that: when its PLAYER SPRITE option names a
+    -- portrait it returns its own file and never calls next().
+    --
+    -- So at the default priority of 0 this link sat downstream of a chain
+    -- that never reached it, and the battle back pic, the trainer card, Oak's
+    -- intro and the Hall of Fame stayed red no matter what was done to them.
+    -- Every attempt at those pictures from 1.0.0 to 1.1.4 was aimed at the
+    -- wrong end of the problem.
+    --
+    -- 940 puts this one link outside that one, and no further up than it has
+    -- to be.  The swap is computed from the path this link is HANDED, not
+    -- from what downstream would answer -- downstream is where the
+    -- substitution happens, and the point is to get in front of it.
+    --
+    -- The cost is real and is the PLAYER row's to pay: with GREEN the
+    -- player's own portrait is the recoloured vanilla art, so a portrait
+    -- chosen in CRYSTAL SPRITES > PLAYER SPRITE does not apply to the player.
+    -- RED hands that back. Opponent portraits, the animated battle sprites
+    -- and the shiny work are untouched either way -- this link only ever
+    -- answers for the player.
     mod.hooks:wrap("player.sprite", function(next, path, ctx)
-      path = next(path, ctx)
       if ctx.demo or ctx.oakDemo then
         note(path, ctx, "left alone: not the player")
-        return path
+        return next(path, ctx)
       end
       local swapped = greenOf(path)
       if not swapped then
         note(path, ctx, "NOT SWAPPED: outside " .. CACHE)
-        return path
+        return next(path, ctx)
       end
       note(path, ctx, "green")
       -- Drawn as written: without this the palette pass reads our green
@@ -157,7 +181,7 @@ return function(mod)
       -- through and remaps it to something else entirely.
       ctx.trueColor = true
       return swapped
-    end)
+    end, 940)
 
     -- Every sprite record drawn from cache art: SPRITE_RED and, where the
     -- import wrote one, the BICYCLE sheet.  Found by image rather than by id

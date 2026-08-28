@@ -2,7 +2,48 @@
 
 All notable changes to this mod are recorded here, newest first.
 
-## [1.1.4] - unreleased
+## [1.2.0] - unreleased
+
+### Fixed
+
+- **The large sprites were never reachable, and now they are.** The battle
+  back pic, the trainer card, Oak's intro and the Hall of Fame stayed red
+  through every release from 1.0.0 on, and each attempt was aimed at the
+  wrong end of the problem.
+
+  `Hooks:call` walks the chain **highest priority first**, and a link that
+  returns without calling `next()` ends the chain there. Crystal Animated
+  Sprites — which the cart pins — wraps `player.sprite` at priority **930**
+  and does exactly that: when its `PLAYER SPRITE` option names a portrait it
+  returns its own file and never calls `next()`. This mod's link took the
+  default priority of `0`, so it sat downstream of a chain that never reached
+  it. Nothing it did to those pictures could have worked.
+
+  It wraps at **940** now — outside that one, and no further up than it has
+  to be — and computes the swap from the path it is handed rather than from
+  what downstream answers, because downstream is where the substitution
+  happens.
+
+  The cost is the `PLAYER` row's to pay: on `GREEN`, a portrait chosen in
+  `CRYSTAL SPRITES > PLAYER SPRITE` no longer applies to the player. `RED`
+  hands it back. Opponent portraits, the animated battle sprites and the
+  shiny work are untouched either way — this link only ever answers for the
+  player.
+
+### Changed
+
+- **The bill is a green-tinted white** (`#e6f4dc`) rather than the cap's
+  green. Vanilla draws it in the *face's* shade, so it reads as nothing at
+  all; 1.1.3 painted it the cap's green and it merged into the hat instead.
+  Now it has an edge against both.
+- **The bill is found by region, not by direction or by row.** It is a small
+  patch of the face's shade, touching the cap, high in its frame — all three,
+  because any two of them catch something else: small-and-touching is also
+  the hands, touching-and-high is also the top of the face, small-and-high is
+  whatever else is up there. 1.1.3 looked only directly above a pixel and
+  missed the profile frames; 1.1.4's row cutoff assumed a fixed cap height.
+
+## [1.1.4] - 2026-08-28
 
 ### Fixed
 

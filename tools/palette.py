@@ -31,15 +31,22 @@ PAPER = (0xff, 0xff, 0xff)   # shade 1 -- pure white: battle pics matte on it
 SKIN = (0xf0, 0xa3, 0x63)    # shade 2 -- the face and hands; sampled from the reference
 OUTFIT = (0x65, 0xba, 0x3f)  # shade 3 -- the cap and clothes; the reference green
 MOUTH = (0xec, 0x4d, 0x29)   # the lips; vanilla's own, sampled off red Red
+BILL = (0xe6, 0xf4, 0xdc)    # the cap's bill: a green-tinted white
 INK = (0x00, 0x00, 0x00)     # shade 4 -- outline and hair
 
 RAMP = [PAPER, SKIN, OUTFIT, INK]
 
-# Not a shade: two pixels of the sprite that share the outfit's shade but are
-# not clothing, told apart by where they sit rather than by colour.  MOUTH is
-# vanilla's own -- red Red's lips are drawn in the cap's shade, so they come
-# out red, and "the default colour" is what they should stay.
-EXTRA = {"MOUTH": MOUTH}
+# Not shades.  Two parts of the sprite are drawn in a shade that is not their
+# own, and are told apart by where they sit rather than by colour.
+#
+# MOUTH is vanilla's own: red Red's lips are drawn in the CAP's shade, so they
+# come out red, and "the default colour" is what they should stay.
+#
+# BILL is neither.  Vanilla draws it in the FACE's shade, so on red Red it is
+# the colour of his cheek and reads as nothing; painting it the cap's green
+# merged it into the hat instead.  A green-tinted white gives it an edge
+# against both.
+EXTRA = {"MOUTH": MOUTH, "BILL": BILL}
 
 # The title ribbon band (LOGO1).  Ink is the lettering; MID is its shadow.
 TITLE_MID = (0x2e, 0x8b, 0x3a)

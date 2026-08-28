@@ -56,6 +56,12 @@ return function(ctx)
   -- sampled off red Red, so they read as lips on a green hat too.
   local MOUTH = { 0xec, 0x4d, 0x29 }
 
+  -- Nor is this.  The bill is drawn in the FACE's shade, so on red Red it is
+  -- the same colour as his cheek and reads as nothing at all -- and painting
+  -- it the cap's green just merged it into the hat.  A green-tinted white
+  -- gives it back its own edge against both.
+  local BILL = { 0xe6, 0xf4, 0xdc }
+
   -- Every picture of the player, by its cache-relative path.
   --
   --   sprites/red.png        the overworld walker (SPRITE_RED, 16x96)
@@ -111,11 +117,26 @@ return function(ctx)
 
   local REACH = 3
 
+  -- The bill is a SMALL patch of the face's shade, TOUCHING the cap, HIGH in
+  -- its frame.  All three, because any two of them catch something else:
+  --
+  --   * small and touching clothing is also the HANDS, which sit beside the
+  --     body lower down -- so the height matters;
+  --   * touching and high is also the top of the FACE in some frames -- so
+  --     the size matters;
+  --   * small and high is also whatever else the cap has around it -- so the
+  --     touching matters.
+  --
+  -- 1.1.3 looked only directly above a pixel and missed the profile frames,
+  -- where the bill sticks out beside the cap rather than under it.  Region
+  -- and neighbourhood, rather than one direction, is what covers all six
+  -- frames of a walker sheet.
+  local BILL_MAX = 8
+
   -- The overworld sheets are 16x16 frames stacked into one column (Art
-  -- Pipeline: "Overworld character sprites"), so a frame-local row is y % 16.
-  -- The cap and its bill sit in the top few of those rows; the face begins
-  -- below them, which is what keeps the face out of the bill rule.
-  local FRAME, BILL_ROWS = 16, 6
+  -- Pipeline: "Overworld character sprites").  The cap and its bill live in
+  -- the top half of a frame; the hands are below it.
+  local FRAME, BILL_ROWS = 16, 8
 
   local function shadeOf(r)
     if r > 0.83 then return 1 end
@@ -124,20 +145,31 @@ return function(ctx)
     return 4
   end
 
-  local function mouthAware(rel, brim)
+  local STEPS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+
+  local function recoloured(rel, bill)
     local src = ctx.readImage(rel)
     local out = ctx.readImage(rel)
     local w, h = src:getDimensions()
 
+    -- every pixel's shade up front: the rules below ask about neighbours, and
+    -- reading them back out of the image being written would see its own work
+    local shade = {}
+    for y = 0, h - 1 do
+      shade[y] = {}
+      for x = 0, w - 1 do
+        local r, _, _, a = src:getPixel(x, y)
+        shade[y][x] = (a == 0) and 0 or shadeOf(r)
+      end
+    end
+
     local function shadeAt(x, y)
       if x < 0 or x >= w or y < 0 or y >= h then return nil end
-      local r, _, _, a = src:getPixel(x, y)
-      if a == 0 then return nil end
-      return shadeOf(r)
+      return shade[y][x]
     end
 
     -- the first shade either side that is not shade 3, within REACH
-    local function neighbour(x, y, step)
+    local function beside(x, y, step)
       for d = 1, REACH do
         local other = shadeAt(x + step * d, y)
         if other == nil or other ~= 3 then return other end
@@ -145,29 +177,57 @@ return function(ctx)
       return nil
     end
 
+    -- flood the shade-2 regions; the small ones that touch the cap are bill
+    local isBill = {}
+    if bill and h % FRAME == 0 then
+      local seen = {}
+      local function mark(x, y)
+        seen[y] = seen[y] or {}
+        if seen[y][x] then return false end
+        seen[y][x] = true
+        return true
+      end
+      for y = 0, h - 1 do
+        for x = 0, w - 1 do
+          if shade[y][x] == 2 and mark(x, y) then
+            local stack, region, touchesCap = { { x, y } }, {}, false
+            while #stack > 0 do
+              local at = table.remove(stack)
+              region[#region + 1] = at
+              for _, step in ipairs(STEPS) do
+                local nx, ny = at[1] + step[1], at[2] + step[2]
+                local s = shadeAt(nx, ny)
+                if s == 3 then
+                  touchesCap = true
+                elseif s == 2 and mark(nx, ny) then
+                  stack[#stack + 1] = { nx, ny }
+                end
+              end
+            end
+            local high = true
+            for _, at in ipairs(region) do
+              if at[2] % FRAME >= BILL_ROWS then high = false break end
+            end
+            if touchesCap and high and #region <= BILL_MAX then
+              for _, at in ipairs(region) do
+                isBill[at[2]] = isBill[at[2]] or {}
+                isBill[at[2]][at[1]] = true
+              end
+            end
+          end
+        end
+      end
+    end
+
     out:mapPixel(function(x, y, r, g, b, a)
       if a == 0 then return r, g, b, a end
-      local shade = shadeOf(r)
-      local colour = WILD_GREEN[shade]
-      if shade == 3 and neighbour(x, y, -1) == 2 and neighbour(x, y, 1) == 2 then
+      local s = shade[y][x]
+      local colour = WILD_GREEN[s]
+      if s == 3 and beside(x, y, -1) == 2 and beside(x, y, 1) == 2 then
         -- a mouth: the outfit's shade, but enclosed by face
         colour = MOUTH
-      elseif brim and shade == 2 and y % FRAME < BILL_ROWS
-          and (shadeAt(x, y - 1) == 3 or shadeAt(x, y + 1) == 3
-               or shadeAt(x - 1, y) == 3 or shadeAt(x + 1, y) == 3) then
-        -- the cap's bill: the face's shade, but touching the cap and high up
-        -- in the frame.  Vanilla draws it in the skin's shade, so on red Red
-        -- the bill and the face are the same colour and nobody notices; a
-        -- green cap over a skin-coloured bill reads as no bill at all.
-        --
-        -- Any of the four neighbours, not just above.  Facing down the bill
-        -- sits UNDER the cap; facing sideways it sticks out BESIDE it, which
-        -- 1.1.3's above-only rule missed -- so the front view had a green bill
-        -- and the side view a skin one, and the two disagreed.
-        --
-        -- BILL_ROWS is what keeps the face out of it: the cap and its bill
-        -- live in the top of each 16px frame, the face begins below them.
-        colour = WILD_GREEN[3]
+      elseif s == 2 and isBill[y] and isBill[y][x] then
+        colour = BILL
       end
       return colour[1] / 255, colour[2] / 255, colour[3] / 255, a
     end)
@@ -186,8 +246,10 @@ return function(ctx)
       -- turn green.
       -- ...and only when the sheet really is a stack of 16px frames, since
       -- y % 16 means nothing otherwise.
-      local brim = rel:match("^sprites/") ~= nil
-      local ok, image = pcall(mouthAware, rel, brim)
+      -- ...and only when the sheet really is a stack of 16px frames, since
+      -- a frame-local row means nothing otherwise.
+      local bill = rel:match("^sprites/") ~= nil
+      local ok, image = pcall(recoloured, rel, bill)
       if not ok then
         image = ctx.recolor(ctx.readImage(rel), WILD_GREEN)
       end
