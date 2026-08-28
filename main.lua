@@ -24,9 +24,10 @@
 --   sprites            the overworld walker.  A real record, so a patch does
 --                      land -- and being a record it is decided at load, so
 --                      PLAYER takes effect on the next launch.
---   field.boot.title   the title screen's standing figure, and the version
---                      ribbon.  boot.title is the mod-reachable half of
---                      field.title, which the field schema does not expose.
+--   field.boot.title   the title screen's version ribbon.  boot.title is the
+--                      mod-reachable half of field.title, which the field
+--                      schema does not expose.  The standing FIGURE on that
+--                      screen is deliberately left alone -- see below.
 --   field.boot         playerName, so the game offers GREEN where it used to
 --                      offer RED.
 --   palettes LOGO1     the SGB palette the title's ribbon band wears.
@@ -155,11 +156,12 @@ return function(mod)
     bootPatch.playerName = "GREEN"
   end
 
-  if green then
-    -- The standing figure on the title is not playerPics; TitleState reads
-    -- it off field.title.player and falls back to the cache path.
-    title.player = GREEN .. "title/player.png"
-  end
+  -- The title screen's standing figure stays vanilla, deliberately.
+  -- TitleState bakes the OBJ palette onto it and cuts its rectangle out of
+  -- the true-colour region so the mon behind it keeps its palette, so there
+  -- is no seam to hand it recoloured art through: 1.1.0 tried, and the pic
+  -- came back through the shade buckets as a white-and-pink figure.  The
+  -- ribbon carries the branding on that screen by itself.
 
   if option("ribbon", true) then
     -- versionRibbon, not version: the importer's key is the vanilla pair of

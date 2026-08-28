@@ -7,8 +7,7 @@ own ledger stays "None currently"; these are this mod's divergences.
 
 - **The player wears green.** The overworld walker, the `BICYCLE` sheet where
   the import wrote one, the battle back pic, the front pic that Oak's intro,
-  the trainer card and the Hall of Fame share, and the standing figure on the
-  title screen are recolored from the player's own imported cache to the Wild
+  and the trainer card and the Hall of Fame share are recolored from the player's own imported cache to the Wild
   Green ramp. Only the outfit shade changes: the face keeps a skin tone and
   the hair and outline stay black. `PLAYER = RED` turns all of it off.
 - **The default name is `GREEN`**, where the game offered `RED`. It is the
@@ -21,6 +20,11 @@ own ledger stays "None currently"; these are this mod's divergences.
   that reads it.
 
 ## Known limits
+
+- **The title screen's standing figure stays vanilla.** `TitleState` bakes
+  the OBJ palette onto it and cuts its rectangle out of the true-colour
+  region so the cycling mon keeps its palette, so there is no seam to hand it
+  recoloured art through. The ribbon carries that screen instead.
 
 - **The green band is a registry record only under SGB.** `PaletteFX.pal`
   (`src/render/PaletteFX.lua`) short-circuits every named palette to the

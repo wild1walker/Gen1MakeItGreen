@@ -19,7 +19,7 @@ It works on its own too. Nothing here depends on either bundle.
 | the overworld walker | `SPRITE_RED`, and the `BICYCLE` sheet where the import wrote one | the `sprites` registry |
 | the battle back pic | the one drawn at 2x until "Go!" | the `player.sprite` hook |
 | the front pic | Oak's intro, the trainer card, the Hall of Fame | the `player.sprite` hook |
-| the title screen | the standing figure, and the version ribbon | `field.boot.title` |
+| the title screen | the version ribbon only — **not** the standing figure | `field.boot.title` |
 | the default name | `GREEN` where the game offered `RED` | `field.boot.playerName` |
 
 The two battle pics go through the **hook** rather than a registry write, and
@@ -86,15 +86,28 @@ cart's shell and the cart's label:
 | | | |
 |---|---|---|
 | paper | `#ffffff` | stays pure white: the battle back pic mattes on it |
-| skin | `#f8d8a8` | **the face, and the shirt's white** |
+| skin | `#f0a363` | **the face and hands** — sampled off the reference sprite |
 | outfit | `#65ba3f` | the cap and clothes — the reference green |
 | ink | `#000000` | outline and hair |
 
-That second row is the one 1.0.0 got wrong. Shade 2 is not clothing; it is
-the skin. Recolouring shades 2 and 3 both turns the face green with the cap,
-which in the field read as one green blob. Under `trueColor` these pixels are
-drawn exactly as written and the palette pass is not coming along afterwards
-to make a face out of grey, so shade 2 has to be a skin tone itself.
+That second row is the one this mod got wrong twice. Shade 2 is not clothing;
+it is the skin. 1.0.0 recoloured shades 2 and 3 both, which turned the face
+green with the cap and read as one green blob. 1.1.0 made it `#f8d8a8` and
+the face read as a washed-out cream nothing. Under `trueColor` these pixels
+are drawn exactly as written and no palette pass follows to make a face out
+of them, so shade 2 has to be a real skin tone — and the one that works is
+the one measured off the reference, not the one picked from the middle of
+the ramp.
+
+### The title screen's figure is not recoloured
+
+`TitleState` bakes the OBJ palette onto that pic and gives it no `trueColor`
+path — `markVisibleTrueColor` cuts the player's rectangle *out* of the
+true-colour region on purpose, so the mon cycling behind him keeps its
+palette. Art handed to that draw comes back through the shade buckets: the
+tan reads as white and the green as whatever colour index 3 happens to be,
+which in the field was pink. There is no seam for it, so the figure stays as
+the base game drew it and the ribbon carries that screen by itself.
 
 **The title band** is lettering on white, not a sprite, so it gets its own —
 and both greens are dark enough to read as ink at 8px, which the character's

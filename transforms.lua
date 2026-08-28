@@ -45,7 +45,7 @@ return function(ctx)
   -- lightest first, which is the order ctx.recolor reads
   local WILD_GREEN = {
     { 0xff, 0xff, 0xff },   -- paper  -- pure white: battle pics matte on it
-    { 0xf8, 0xd8, 0xa8 },   -- skin   #f8d8a8  the face, and the shirt's white
+    { 0xf0, 0xa3, 0x63 },   -- skin   #f0a363  the face and hands
     { 0x65, 0xba, 0x3f },   -- outfit #65ba3f  the cap and clothes
     { 0x00, 0x00, 0x00 },   -- ink    -- outline and hair
   }
@@ -56,11 +56,20 @@ return function(ctx)
   --   sprites/red_bike.png   the same on the BICYCLE, where the import made one
   --   battle/redb.png        the battle back pic, drawn at 2x until "Go!"
   --   trainer_card/red.png   the front pic: Oak's intro, the card, Hall of Fame
-  --   title/player.png       the title screen's standing Red
+  --
+  -- The title screen's standing figure is NOT in this list, and cannot be.
+  -- TitleState bakes the OBJ palette onto it (Sprites.recolor with
+  -- PaletteFX.ogObj) and has no trueColor path for it -- markVisibleTrueColor
+  -- explicitly cuts the player's rectangle OUT of the true-colour region, so
+  -- the mon behind him keeps its palette.  A recoloured pic handed to that
+  -- draw is read back through the shade buckets: the tan skin comes out white
+  -- and the green outfit comes out whatever colour index 3 happens to be,
+  -- which in the field was pink.  So the title keeps the figure the base game
+  -- drew, and the ribbon carries the branding on its own.
   --
   -- The names are the importer's, not this mod's, and a cache that spells one
   -- differently is a cache this mod cannot recolour -- so every candidate is
-  -- probed rather than assumed, and what was written is logged at the end.
+  -- probed rather than assumed.
   -- The hook in main.lua derives its green path from whatever the engine
   -- hands it, so anything written here is picked up without being named
   -- twice.
@@ -73,7 +82,6 @@ return function(ctx)
     "battle/redb.png",
     "battle/back/redb.png",
     "trainer_card/red.png",
-    "title/player.png",
   }
 
   for _, rel in ipairs(PICS) do

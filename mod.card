@@ -12,9 +12,9 @@ return {
     added = {
       "the player in green: the overworld walker, the BICYCLE sheet where "
         .. "the import wrote one, the battle back pic, the front pic Oak's "
-        .. "intro and the trainer card and the Hall of Fame share, and the "
-        .. "standing figure on the title screen. Only the outfit shade "
-        .. "changes -- the face keeps a skin tone and the hair stays black",
+        .. "intro and the trainer card and the Hall of Fame share. Only the "
+        .. "outfit shade changes -- the face keeps a warm tan and the hair "
+        .. "stays black",
       "GREEN as the default name, where the game offered RED",
       "WILD GREEN VERSION on the title screen, as one continuous ribbon "
         .. "where the vanilla art is two fragments the title code "
@@ -39,6 +39,10 @@ return {
         .. "OG RED and reads data/palettes_gbc under ADVANCED, so in those "
         .. "two the ribbon keeps that mode's own colour -- the lettering is "
         .. "still WILD GREEN VERSION, drawn in red",
+      "the title screen's standing figure is NOT recoloured: TitleState "
+        .. "bakes the OBJ palette onto it and cuts its rectangle out of the "
+        .. "true-colour region so the cycling mon keeps its palette, so "
+        .. "there is no seam to hand it recoloured art through",
       "the recolored art is true-colour, which the mono and inverted "
         .. "display modes do not honour; there the player falls back to the "
         .. "baked ramp like any other sprite",

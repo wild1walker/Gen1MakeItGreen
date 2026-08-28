@@ -2,7 +2,27 @@
 
 All notable changes to this mod are recorded here, newest first.
 
-## [1.1.0] - unreleased
+## [1.1.1] - unreleased
+
+Two more from the field, both on 1.1.0's own fixes.
+
+### Fixed
+
+- **The skin was a pale cream, not skin.** `#f8d8a8` read as no colour at
+  all -- a washed-out blob where a face should be. It is `#f0a363` now, a
+  warm tan, sampled straight off the reference sprite rather than guessed
+  at from the middle of the ramp.
+- **The title screen's standing figure came out white and pink.**
+  `TitleState` bakes the OBJ palette onto that pic (`Sprites.recolor` with
+  `PaletteFX.ogObj`) and gives it no `trueColor` path -- `markVisibleTrueColor`
+  cuts the player's rectangle *out* of the true-colour region on purpose, so
+  the cycling mon behind him keeps its palette. Recoloured art handed to that
+  draw is read back through the shade buckets: the tan comes out white and
+  the green comes out whatever colour index 3 is. There is no seam to do this
+  through, so the figure stays as the base game drew it and the ribbon
+  carries that screen on its own. The recipe no longer writes it either.
+
+## [1.1.0] - 2026-08-28
 
 Everything in 1.0.0 that reached the screen reached it wrong. This is the
 fix, from four things seen in the field.

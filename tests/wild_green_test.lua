@@ -94,12 +94,16 @@ do
     wrote[rel] = true
     count = count + 1
   end
-  eq(count, 5, "five pictures written")
+  eq(count, 4, "four pictures written")
   for _, rel in ipairs({ "sprites/red.png", "sprites/red_bike.png",
-                         "battle/redb.png", "trainer_card/red.png",
-                         "title/player.png" }) do
+                         "battle/redb.png", "trainer_card/red.png" }) do
     ok(wrote["green/" .. rel], "green/" .. rel .. " written")
   end
+  -- TitleState bakes the OBJ palette onto the title figure and gives it no
+  -- trueColor path, so recoloured art handed to that draw comes back through
+  -- the shade buckets -- white and pink, in the field.  It is not recoloured.
+  ok(not wrote["green/title/player.png"],
+    "the title screen's standing figure is not recoloured")
   ok(not wrote["green/battle/oldmanb.png"],
     "the old man's demo back pic is left alone")
   ok(not wrote["green/sprites/oak.png"], "Oak is left alone")
@@ -114,7 +118,7 @@ do
   eq(("%02x%02x%02x"):format(shades[1][1], shades[1][2], shades[1][3]),
     "ffffff", "shade 1 is pure white, so a battle pic still mattes")
   eq(("%02x%02x%02x"):format(shades[2][1], shades[2][2], shades[2][3]),
-    "f8d8a8", "shade 2 is SKIN, not green -- it is the face and the shirt")
+    "f0a363", "shade 2 is a warm tan skin, not green and not a pale cream")
   eq(("%02x%02x%02x"):format(shades[3][1], shades[3][2], shades[3][3]),
     "65ba3f", "shade 3 is the outfit green")
   eq(("%02x%02x%02x"):format(shades[4][1], shades[4][2], shades[4][3]),
@@ -263,9 +267,8 @@ do
 
   local boot = mod.content.field.patches.boot
   ok(boot and boot.title, "field.boot.title is patched")
-  eq(boot and boot.title and boot.title.player,
-    "assets/generated/green/title/player.png",
-    "the title's standing figure is green")
+  ok(boot and boot.title and boot.title.player == nil,
+    "the title's standing figure is left vanilla -- it has no trueColor seam")
   eq(boot and boot.title and boot.title.versionRibbon,
     "mods/wild_green/assets/title/wild_green_version.png",
     "the ribbon is the mod's own art")
@@ -315,8 +318,6 @@ do
     "and the default name stays RED")
 
   local boot = mod.content.field.patches.boot
-  ok(boot and boot.title and boot.title.player == nil,
-    "the title's standing figure is vanilla again")
   eq(boot and boot.title and boot.title.versionRibbon,
     "mods/wild_green/assets/title/wild_green_version.png",
     "the ribbon still says WILD GREEN VERSION -- it is the game's name")
@@ -328,7 +329,9 @@ io.write("main.lua -- TITLE RIBBON off\n")
 do
   local mod = run({ player = "green", ribbon = false })
   local boot = mod.content.field.patches.boot
-  ok(boot and boot.title and boot.title.versionRibbon == nil,
+  -- With the figure no longer patched, TITLE RIBBON off leaves nothing for
+  -- boot.title to carry, so the key is absent rather than empty.
+  ok(boot == nil or boot.title == nil or boot.title.versionRibbon == nil,
     "the imported ribbon comes back")
   ok(mod.content.palettes.overrides.LOGO1 == nil,
     "...and so does the imported band colour")

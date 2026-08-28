@@ -28,7 +28,7 @@ sprite.  Both its greens are dark enough to read as green ink on paper at
 
 # The character, lightest first -- the order ctx.recolor reads.
 PAPER = (0xff, 0xff, 0xff)   # shade 1 -- pure white: battle pics matte on it
-SKIN = (0xf8, 0xd8, 0xa8)    # shade 2 -- the face, and the shirt's white
+SKIN = (0xf0, 0xa3, 0x63)    # shade 2 -- the face and hands; sampled from the reference
 OUTFIT = (0x65, 0xba, 0x3f)  # shade 3 -- the cap and clothes; the reference green
 INK = (0x00, 0x00, 0x00)     # shade 4 -- outline and hair
 
