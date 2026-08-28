@@ -206,7 +206,15 @@ The recipe writes **both** copies of every portrait — `green/` and
 than deciding a recolour. That is what makes it a switch you can flip in a
 menu instead of one that needs a release to undo.
 
-The title screen's standing figure is not covered by it: that one is baked
+The title screen's standing figure **is** covered by it, in one mode. In
+every other mode his rectangle is painted by shade — the colour a file
+carries is thrown away before it reaches the screen — so `MEWMON` does that
+work. Under `ADVANCED` the zone pass never reaches him, and `main.lua` hands
+that draw the recipe's own copy of `title/player.png`, so the same face, ear
+and hands the trainer card gets come with it. A cache with no such file
+falls back to `main.lua`'s flat bake.
+
+Not covered: that one is baked
 from the grey art at draw time (see below), not read from a file, and it
 keeps the flat green.
 
@@ -264,7 +272,9 @@ and changed nothing on screen; 1.6.0 is where the figure actually turns
 green.
 
 It is the mod's one engine internal, and the reason it declares
-`engine_internals`. Every step of it is guarded: without the module, without
+`engine_internals` — `src.ui.TitleState`, `src.render.PaletteFX` and
+`src.render.Assets`, whose `resolve` is what turns an
+`assets/generated/...` path into the derived file a transform wrote. Every step of it is guarded: without the module, without
 `love.graphics`, without a clonable `ImageData`, the figure is exactly what
 it was before, and nothing else in the mod is affected.
 

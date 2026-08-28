@@ -104,15 +104,19 @@ return function(ctx)
   -- decides, and a cache without one simply keeps that picture as the base
   -- game drew it.
   --
-  -- Two absences are deliberate.  The old man's demo back pic
+  -- One absence is deliberate: the old man's demo back pic
   -- (battle/oldmanb.png) is not the player, and the catch tutorial should
-  -- not turn green.  And the title screen's standing figure is not swapped
-  -- either: his rectangle is cut out of the true-colour region so the mon
-  -- cycling behind him keeps its palette, and what is left is painted by
-  -- shade -- by the SGB zone pass in most modes, and by another mod's
-  -- luminance bake under REDPP.  Either way the colour a recoloured file
-  -- carries is thrown away before it reaches the screen.  main.lua colours
-  -- him through MEWMON and, under REDPP, through a bake of its own.
+  -- not turn green.
+  --
+  -- title/player.png is the figure holding the ball out on the title screen,
+  -- and it is here for one mode only.  Everywhere else that rectangle is cut
+  -- out of the true-colour region so the mon cycling behind him keeps its
+  -- palette, and what is left is painted BY SHADE -- so the colour a
+  -- recoloured file carries is thrown away and MEWMON does the work instead.
+  -- Under ADVANCED the zone pass never reaches him, main.lua hands that draw
+  -- this file, and the same face and hands the trainer card gets come with
+  -- it.  main.lua's own bake stays as the fallback for a cache that has no
+  -- such file.
   --
   -- `field` picks the ramp: true takes the overworld four and the mouth and
   -- bill rules, false takes the portrait four and neither.
@@ -125,6 +129,7 @@ return function(ctx)
     { "credits/red.png", false },
     { "intro/red.png", false },
     { "hall_of_fame/red.png", false },
+    { "title/player.png", false },
   }
 
   -- ------- the mouth is not clothing

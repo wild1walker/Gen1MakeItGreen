@@ -139,6 +139,7 @@ return function(mod)
     { "credits/red.png", false },
     { "intro/red.png", false },
     { "hall_of_fame/red.png", false },
+    { "title/player.png", false },
   }
 
   local KNOWN, PORTRAIT = {}, {}
@@ -451,6 +452,24 @@ return function(mod)
     if TitleState.__wildGreenFigure then return "already wrapped" end
     local okFX, PaletteFX = pcall(require, "src.render.PaletteFX")
     if not okFX or type(PaletteFX) ~= "table" then return "no PaletteFX" end
+    local okAssets, Assets = pcall(require, "src.render.Assets")
+    if not okAssets or type(Assets) ~= "table" then Assets = nil end
+
+    -- The recipe's own copy of this figure, which is the same art the
+    -- trainer card gets and so has the same face, ear and hands on it.
+    -- TitleState keeps the path it loaded him from (self.playerPath), so
+    -- there is nothing to guess: the green twin of THAT is what to draw.
+    -- Assets.image resolves an "assets/generated/..." path through
+    -- save/mod-derived, which is where a transform's output lives.
+    local function derived(title)
+      if not Assets or type(Assets.image) ~= "function" then return nil end
+      local swapped = greenOf(title.playerPath)
+      if not swapped then return nil end
+      local ok, image = pcall(Assets.image, swapped)
+      if not (ok and image) then return nil end
+      pcall(image.setFilter, image, "nearest", "nearest")
+      return image
+    end
 
     -- Where the strip is drawn.  Not derivable from here: it is the rect
     -- Crystal marks true-colour for the same image on the same screen, and
@@ -472,12 +491,21 @@ return function(mod)
       end
       if PaletteFX.mode == "redpp" then
         if title.__wildGreenBaked == nil then
-          title.__wildGreenBaked = greenBake(raw) or false
+          -- the recipe's copy first: it is the whole figure, skin and all.
+          -- The bake is the fallback, and it is flat green -- it works off
+          -- the shade buckets alone and knows nothing about where a face is.
+          local how = "the recipe's green copy"
+          title.__wildGreenBaked = derived(title)
+          if not title.__wildGreenBaked then
+            how = "a flat bake -- no derived copy of " ..
+              tostring(title.playerPath)
+            title.__wildGreenBaked = greenBake(raw) or false
+          end
           -- once per visit to that screen, and the line 1.4.0 needed: the
           -- wrap succeeded there and the BAKE was what failed, silently, a
           -- frame later.  "wrapped" was true and the figure was still red.
           mod.log:info("title figure: %s", title.__wildGreenBaked
-            and "baked green"
+            and how
             or "could not read the art, left as it was")
         end
         local baked = title.__wildGreenBaked

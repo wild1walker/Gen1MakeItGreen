@@ -338,7 +338,7 @@ do
     wrote[rel] = true
     count = count + 1
   end
-  eq(count, 6, "only what this cache carries is written")
+  eq(count, 8, "only what this cache carries is written")
   ok(wrote["greenskin/battle/redb.png"] and wrote["greenskin/trainer_card/red.png"],
     "...and every portrait gets a skinned twin beside it")
   ok(not wrote["greenskin/sprites/red.png"],
@@ -347,12 +347,12 @@ do
                          "battle/redb.png", "trainer_card/red.png" }) do
     ok(wrote["green/" .. rel], "green/" .. rel .. " written")
   end
-  -- The title figure is painted by shade, not by colour -- the zone pass in
-  -- most modes, another mod's luminance bake under REDPP -- so a recoloured
-  -- file for him is thrown away before it reaches the screen.  He is
-  -- coloured at the other end instead; see the REDPP section below.
-  ok(not wrote["green/title/player.png"],
-    "the title screen's standing figure is not recoloured")
+  -- The title figure IS recoloured, for one mode.  In every other mode his
+  -- rectangle is painted by shade and the colour a file carries is thrown
+  -- away, so MEWMON does that work; under ADVANCED main.lua hands the draw
+  -- this file instead, and the face and hands come with it.
+  ok(wrote["green/title/player.png"] and wrote["greenskin/title/player.png"],
+    "the title screen's standing figure gets both copies too")
   ok(not wrote["green/battle/oldmanb.png"],
     "the old man's demo back pic is left alone")
   ok(not wrote["green/sprites/oak.png"], "Oak is left alone")
@@ -518,7 +518,8 @@ do
   local boot = mod.content.field.patches.boot
   ok(boot and boot.title, "field.boot.title is patched")
   ok(boot and boot.title and boot.title.player == nil,
-    "the title's standing figure is not swapped -- it is coloured, not swapped")
+    "boot.title does not repoint the figure: every mode but ADVANCED paints "
+    .. "him by shade, so the swap happens at the draw, not in the record")
   eq(boot and boot.title and boot.title.versionRibbon,
     "mods/wild_green/assets/title/wild_green_version.png",
     "the ribbon is the mod's own art")
@@ -729,7 +730,8 @@ end
 -- `lazy` is the art the inner link loads for itself, the way a screen that
 -- builds its own picture inside currentSprite would -- there is nothing to
 -- capture on the way in then, and the fallback is what has to find it.
-local function titleScreen(options, mode, lazy)
+local function titleScreen(options, mode, lazy, cache)
+  cache = cache or {}
   local marks = {}
   local PaletteFX = {
     mode = mode,
@@ -760,8 +762,21 @@ local function titleScreen(options, mode, lazy)
     return "the cycling mon", true
   end
 
+  -- the recipe's own copy of the figure, reached the way the engine reaches
+  -- a derived file: Assets.image over an "assets/generated/..." path
+  local asked = {}
+  local Assets = { image = function(path)
+    asked[#asked + 1] = path
+    if not cache[path] then return nil, "no such file" end
+    local image = { kind = "derived", path = path }
+    function image:getDimensions() return 8, 12 end
+    function image:setFilter() end
+    return image
+  end }
+
   package.loaded["src.ui.TitleState"] = TitleState
   package.loaded["src.render.PaletteFX"] = PaletteFX
+  package.loaded["src.render.Assets"] = Assets
 
   -- left installed on purpose: main.lua reads the `love` global when it
   -- bakes, which is at currentSprite time and not at load
@@ -810,10 +825,11 @@ local function titleScreen(options, mode, lazy)
 
   package.loaded["src.ui.TitleState"] = nil
   package.loaded["src.render.PaletteFX"] = nil
+  package.loaded["src.render.Assets"] = nil
 
   return {
     mod = mod, TitleState = TitleState, PaletteFX = PaletteFX,
-    marks = marks, inner = inner, made = made, gfx = gfx,
+    marks = marks, inner = inner, made = made, gfx = gfx, asked = asked,
     -- one 4x2 strip in the four grey shades the importer writes, in the
     -- shape LOVE 11 hands over: no getData on it
     raw = fakeTitleImage({ { W, S, O, K }, { W, S, O, K } }),
@@ -890,6 +906,44 @@ do
   ok(old.player ~= nil and old.player.kind == "baked",
     "an Image that does have getData is baked through it")
   eq(legacy.gfx.drawn, nil, "...and no canvas is touched for it")
+end
+
+io.write("main.lua -- the title figure prefers the recipe's copy\n")
+do
+  -- The bake is flat green: it works off the shade buckets and knows nothing
+  -- about where a face is.  The recipe's copy of the same picture has the
+  -- face, the ear and the hands on it already, so that is what the draw gets
+  -- when there is one -- and the bake is what is left when there is not.
+  local have = { ["assets/generated/greenskin/title/player.png"] = true }
+  local screen = titleScreen({ player = "green", ribbon = true }, "redpp", nil, have)
+  local title = { player = screen.raw,
+                  playerPath = "assets/generated/title/player.png" }
+  screen.TitleState.currentSprite(title)
+  eq(title.player and title.player.kind, "derived",
+    "the figure is the recipe's copy, not a bake")
+  eq(title.player and title.player.path,
+    "assets/generated/greenskin/title/player.png",
+    "...the skinned one, because PORTRAIT SKIN is on")
+  eq(screen.gfx.drawn, nil, "and no canvas was touched for it")
+
+  -- PORTRAIT SKIN off asks for the flat copy instead
+  local flat = { ["assets/generated/green/title/player.png"] = true }
+  local off = titleScreen({ player = "green", portrait_skin = false },
+                          "redpp", nil, flat)
+  local t2 = { player = off.raw,
+               playerPath = "assets/generated/title/player.png" }
+  off.TitleState.currentSprite(t2)
+  eq(t2.player and t2.player.path, "assets/generated/green/title/player.png",
+    "off, the figure is the flat copy")
+
+  -- and a cache with no such file still gets a figure, baked
+  local none = titleScreen({ player = "green", ribbon = true }, "redpp", nil, {})
+  local t3 = { player = none.raw,
+               playerPath = "assets/generated/title/player.png" }
+  none.TitleState.currentSprite(t3)
+  eq(t3.player and t3.player.kind, "baked",
+    "with no derived copy, the bake still runs")
+  eq(hex(t3.player.data.out[1][3]), "65ba3f", "...and it is still green")
 end
 
 io.write("main.lua -- the title figure out of REDPP\n")
