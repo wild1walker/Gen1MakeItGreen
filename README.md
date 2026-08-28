@@ -1,6 +1,7 @@
 # Wild Green
 
-**The player is green and the title screen says so.** That is the whole mod.
+**The player wears green, he is called GREEN, and the title screen says so.**
+That is the whole mod.
 
 It is the identity half of the [Wild Green][cart] cart: the cart
 pins [Gen1WildUI](https://github.com/wild1walker/Gen1WildUI) and
@@ -13,12 +14,21 @@ It works on its own too. Nothing here depends on either bundle.
 
 ## What it changes
 
-| | |
-|---|---|
-| the overworld walker | `SPRITE_RED`, and the `BICYCLE` sheet where the import wrote one |
-| the battle back pic | the one drawn at 2x until "Go!" |
-| the front pic | Oak's intro, the trainer card, the Hall of Fame |
-| the title screen | the standing figure, and the version ribbon |
+| | | how |
+|---|---|---|
+| the overworld walker | `SPRITE_RED`, and the `BICYCLE` sheet where the import wrote one | the `sprites` registry |
+| the battle back pic | the one drawn at 2x until "Go!" | the `player.sprite` hook |
+| the front pic | Oak's intro, the trainer card, the Hall of Fame | the `player.sprite` hook |
+| the title screen | the standing figure, and the version ribbon | `field.boot.title` |
+| the default name | `GREEN` where the game offered `RED` | `field.boot.playerName` |
+
+The two battle pics go through the **hook** rather than a registry write, and
+that is not a style choice. `Sprites.playerPath` resolves them through
+`FieldDefaults.fieldValue`, not `data.field` — so `field:get("playerPics")`
+hands back nothing, and a patch built out of it patches nothing at all. That
+is what 1.0.0 did, and why the player stayed red everywhere but the
+overworld. The hook runs over the already-resolved path, so it needs no guess
+about where the vanilla art lives.
 
 The ribbon is one continuous strip reading **WILD GREEN VERSION**, where the
 vanilla art is two fragments the title code repositions. It is drawn by
@@ -26,14 +36,15 @@ vanilla art is two fragments the title code repositions. It is drawn by
 grey shades, and the green arrives from the `LOGO1` palette this mod
 overrides — the SGB palette the title's ribbon band wears.
 
-## The two rows
+## The three rows
 
 In the mod manager, or in `OPTION > MODS`:
 
 ```
 WILD GREEN
-  PLAYER          GREEN     <- or RED
-  TITLE RIBBON    ON
+  PLAYER              GREEN     <- or RED
+  TITLE RIBBON        ON
+  DEFAULT NAME GREEN  ON
 ```
 
 - **`PLAYER`** is the switch back. `RED` gives you the vanilla character
@@ -44,6 +55,10 @@ WILD GREEN
   Off gives back the imported ribbon and the imported band colour. On, the
   title says `WILD GREEN VERSION` whichever colour the character is —
   that is the game's name, not the character's outfit.
+- **`DEFAULT NAME GREEN`** is the name offered before you type one. It has a
+  row of its own because it is the one thing here that ends up written into
+  a save, and it follows `PLAYER`: switch the character back to red and the
+  name goes back with him.
 
 ## No green pixel ships
 
@@ -66,12 +81,29 @@ Four colours, in [`tools/palette.py`](tools/palette.py), and the same
 four everywhere they appear — the sprite recolor, the ribbon lettering, the
 cart's shell and the cart's label:
 
+**The character**, in shade order:
+
 | | | |
 |---|---|---|
 | paper | `#ffffff` | stays pure white: the battle back pic mattes on it |
-| light | `#65ba3f` | the reference sprite green |
-| dark | `#1e7a2b` | the `VERSION` lettering, and the cartridge shell |
-| ink | `#000000` | |
+| skin | `#f8d8a8` | **the face, and the shirt's white** |
+| outfit | `#65ba3f` | the cap and clothes — the reference green |
+| ink | `#000000` | outline and hair |
+
+That second row is the one 1.0.0 got wrong. Shade 2 is not clothing; it is
+the skin. Recolouring shades 2 and 3 both turns the face green with the cap,
+which in the field read as one green blob. Under `trueColor` these pixels are
+drawn exactly as written and the palette pass is not coming along afterwards
+to make a face out of grey, so shade 2 has to be a skin tone itself.
+
+**The title band** is lettering on white, not a sprite, so it gets its own —
+and both greens are dark enough to read as ink at 8px, which the character's
+light green was not:
+
+| | | |
+|---|---|---|
+| mid | `#2e8b3a` | the lettering's shadow |
+| ink | `#14571f` | the `VERSION` lettering, **and the cartridge shell** |
 
 They are written out three times — once in Python, twice in Lua — because
 none of the three can import from the others: the transform runs in a sandbox

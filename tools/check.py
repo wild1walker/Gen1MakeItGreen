@@ -6,9 +6,12 @@
 Three copies of the Wild Green palette exist in this tree, and they have to
 agree:
 
-    tools/palette.py    what the ribbon and the cart's label are drawn from
-    transforms.lua      what the player's art is recolored to
-    main.lua            what LOGO1 is overridden with
+    tools/palette.py    RAMP and TITLE_RAMP, and what the label is drawn from
+    transforms.lua      WILD_GREEN, what the player's art is recolored to
+    main.lua            WILD_GREEN_TITLE, what LOGO1 is overridden with
+
+The character ramp and the title ramp are different on purpose: the character
+is a sprite whose second shade is skin, and the ribbon is lettering on white.
 
 They are copies rather than one file because none of the three can import
 from either of the others: the transform runs in a sandbox with no require,
@@ -33,9 +36,13 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from palette import DARK, INK, LIGHT, PAPER, hexof  # noqa: E402
+from palette import RAMP, TITLE_RAMP, hexof  # noqa: E402
 
-EXPECTED = [PAPER, LIGHT, DARK, INK]
+# (file, the table in it, what tools/palette.py says it must be)
+RAMPS = (
+    ("transforms.lua", "local WILD_GREEN", RAMP),
+    ("main.lua", "local WILD_GREEN_TITLE", TITLE_RAMP),
+)
 RIBBON = ROOT / "assets" / "title" / "wild_green_version.png"
 
 # a { 0xff, 0xff, 0xff } row of a Lua colour table
@@ -65,14 +72,15 @@ def lua_ramp(path, marker):
 
 
 def check_palettes():
-    for name in ("transforms.lua", "main.lua"):
-        ramp = lua_ramp(ROOT / name, "local WILD_GREEN")
+    for name, marker, expected in RAMPS:
+        ramp = lua_ramp(ROOT / name, marker)
         if ramp is None:
             continue
-        if ramp != EXPECTED:
-            fail(name, "the ramp is %s; tools/palette.py says %s"
-                 % (" ".join(hexof(c) for c in ramp),
-                    " ".join(hexof(c) for c in EXPECTED)))
+        if ramp != expected:
+            fail(name, "%s is %s; tools/palette.py says %s"
+                 % (marker.split()[-1],
+                    " ".join(hexof(c) for c in ramp),
+                    " ".join(hexof(c) for c in expected)))
 
 
 def check_generated():

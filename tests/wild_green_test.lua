@@ -114,9 +114,9 @@ do
   eq(("%02x%02x%02x"):format(shades[1][1], shades[1][2], shades[1][3]),
     "ffffff", "shade 1 is pure white, so a battle pic still mattes")
   eq(("%02x%02x%02x"):format(shades[2][1], shades[2][2], shades[2][3]),
-    "65ba3f", "shade 2 is the reference sprite green")
+    "f8d8a8", "shade 2 is SKIN, not green -- it is the face and the shirt")
   eq(("%02x%02x%02x"):format(shades[3][1], shades[3][2], shades[3][3]),
-    "1e7a2b", "shade 3 is the ribbon green")
+    "65ba3f", "shade 3 is the outfit green")
   eq(("%02x%02x%02x"):format(shades[4][1], shades[4][2], shades[4][3]),
     "000000", "shade 4 is ink")
 end
@@ -155,7 +155,12 @@ end
 
 local function fakeMod(options)
   local log = {}
-  local mod = { log = {}, calls = log }
+  local mod = { log = {}, calls = log, hooks = { wrapped = {} } }
+  function mod.hooks:wrap(name, fn)
+    self.wrapped[name] = fn
+    log[#log + 1] = "wrap " .. name
+  end
+  function mod.log:info(...) log[#log + 1] = "info " .. select(1, ...) end
   function mod.log:warn(...) log[#log + 1] = "warn " .. select(1, ...) end
   function mod.log:error(...) log[#log + 1] = "error " .. select(1, ...) end
 
@@ -178,12 +183,12 @@ local function fakeMod(options)
                      frames = 6, walker = true },
       BOULDER = { image = "assets/generated/sprites/boulder.png", frames = 1 },
     }, log),
+    -- No playerPics here, deliberately: Sprites.playerPath reads those
+    -- through FieldDefaults.fieldValue, so data.field does not carry them
+    -- and a mod that builds a patch out of field:get("playerPics") patches
+    -- nothing at all.  That was the 1.0.0 bug; the stub reproduces the
+    -- shape that caused it so the hook is the only route left.
     field = fakeRegistry({
-      playerPics = {
-        back = "assets/generated/battle/redb.png",
-        front = "assets/generated/trainer_card/red.png",
-        demoBack = "assets/generated/battle/oldmanb.png",
-      },
       boot = { startMap = "REDS_HOUSE_2F" },
     }, log),
     palettes = fakeRegistry({
@@ -213,14 +218,48 @@ do
   ok(sprites.SPRITE_OAK == nil, "Oak is not repainted")
   ok(sprites.BOULDER == nil, "the boulder is not repainted")
 
-  local pics = mod.content.field.patches.playerPics
-  ok(pics ~= nil, "the player pics are repointed")
-  eq(pics and pics.back, "assets/generated/green/battle/redb.png",
-    "...the battle back pic")
-  eq(pics and pics.front, "assets/generated/green/trainer_card/red.png",
-    "...and the front pic")
-  ok(pics and pics.demoBack == nil,
-    "the catch tutorial's old man stays as he was")
+  -- The pics go through the hook, over the path the engine already
+  -- resolved.  Nothing is patched into field.playerPics, because nothing
+  -- is there to patch.
+  ok(mod.content.field.patches.playerPics == nil,
+    "field.playerPics is not patched -- those paths are not in data.field")
+  local hook = mod.hooks.wrapped["player.sprite"]
+  ok(hook ~= nil, "player.sprite is wrapped")
+
+  local function through(path, ctx)
+    ctx = ctx or {}
+    return hook(function(p) return p end, path, ctx), ctx
+  end
+
+  local back, backCtx = through("assets/generated/battle/redb.png",
+    { side = "back", kind = "battle" })
+  eq(back, "assets/generated/green/battle/redb.png",
+    "the battle back pic is swapped for the green one")
+  eq(backCtx.trueColor, true,
+    "...and marked true-colour, so the palette pass leaves it alone")
+
+  local front = through("assets/generated/trainer_card/red.png",
+    { side = "front", kind = "intro" })
+  eq(front, "assets/generated/green/trainer_card/red.png",
+    "the front pic Oak's intro and the card share is swapped")
+
+  -- Whatever the engine resolved is what gets a green twin: no filename
+  -- whitelist, so a cache that spells one differently still works.
+  eq(through("assets/generated/battle/back/redb.png", {}),
+    "assets/generated/green/battle/back/redb.png",
+    "an unexpected cache path is still swapped, not ignored")
+
+  eq(through("assets/generated/battle/oldmanb.png", { demo = true }),
+    "assets/generated/battle/oldmanb.png",
+    "the catch tutorial's old man is left alone")
+  eq(through("assets/generated/battle/oakb.png", { oakDemo = true }),
+    "assets/generated/battle/oakb.png",
+    "Yellow's PROF.OAK demo is left alone")
+  eq(through("mods/some_other/hero.png", {}), "mods/some_other/hero.png",
+    "a path outside the cache is left where it points")
+  eq(through("assets/generated/green/battle/redb.png", {}),
+    "assets/generated/green/battle/redb.png",
+    "an already-green path is not doubled up")
 
   local boot = mod.content.field.patches.boot
   ok(boot and boot.title, "field.boot.title is patched")
@@ -236,7 +275,9 @@ do
   ok(mod.content.palettes.overrides.LOGO1 ~= nil, "LOGO1 is overridden")
   local logo = mod.content.palettes.overrides.LOGO1
   eq(logo and ("%02x%02x%02x"):format(logo[3][1], logo[3][2], logo[3][3]),
-    "1e7a2b", "...to the Wild Green ramp")
+    "14571f", "...to the title ramp, which is darker than the character's")
+  ok(logo and logo[2][1] ~= 0xf8,
+    "the title band does not borrow the character's skin shade")
 
   -- the rows the manager draws
   local rows = {}
@@ -246,13 +287,32 @@ do
   ok(rows.ribbon ~= nil, "a TITLE RIBBON row is defined")
 end
 
+io.write("main.lua -- the default name\n")
+do
+  local mod = run({ player = "green", ribbon = true, name = true })
+  local boot = mod.content.field.patches.boot
+  eq(boot and boot.playerName, "GREEN",
+    "the game offers GREEN where it used to offer RED")
+end
+do
+  local mod = run({ player = "green", ribbon = true, name = false })
+  local boot = mod.content.field.patches.boot
+  ok(boot == nil or boot.playerName == nil,
+    "DEFAULT NAME GREEN off leaves the vanilla default alone")
+  ok(mod.content.sprites.patches.SPRITE_RED ~= nil,
+    "...and the character is still green: the rows are independent")
+end
+
 io.write("main.lua -- PLAYER = RED\n")
 do
   local mod = run({ player = "red", ribbon = true })
   ok(next(mod.content.sprites.patches) == nil,
     "no sprite is repointed: the character is vanilla again")
-  ok(mod.content.field.patches.playerPics == nil,
-    "the player pics are vanilla again")
+  ok(mod.hooks.wrapped["player.sprite"] == nil,
+    "player.sprite is not even wrapped, so the pics stay vanilla")
+  ok(mod.content.field.patches.boot == nil
+     or mod.content.field.patches.boot.playerName == nil,
+    "and the default name stays RED")
 
   local boot = mod.content.field.patches.boot
   ok(boot and boot.title and boot.title.player == nil,

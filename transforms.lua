@@ -1,10 +1,24 @@
 -- Wild Green -- the recipe that turns the player green.
 --
--- The player's four pictures are the vanilla ones, so this mod may not ship
--- them: derived art travels as a recipe and the pixels come from the
--- player's own imported cache (Guide: Art Pipeline, "The rule").  This file
--- is that recipe.  It runs once on install, and again only when the cache is
+-- The player's pictures are the vanilla ones, so this mod may not ship them:
+-- derived art travels as a recipe and the pixels come from the player's own
+-- imported cache (Guide: Art Pipeline, "The rule").  This file is that
+-- recipe.  It runs once on install, and again only when the cache is
 -- re-imported or this file changes.
+--
+-- ------- shade 2 is the face, not the outfit
+--
+-- The importer decodes vanilla art to four grey shades and the palette pass
+-- colours them at draw time.  On the player those four are, in order: the
+-- transparent/white ground, the SKIN and the shirt's white, the OUTFIT, and
+-- the black outline and hair.
+--
+-- The first cut of this file recoloured shades 2 and 3 both, on the
+-- assumption that everything above black was clothing.  In the field that
+-- turned his face green as well -- the whole sprite read as one green blob.
+-- Only shade 3 is the outfit.  Shade 2 becomes skin, because under trueColor
+-- these pixels are drawn exactly as written and the palette pass is not
+-- coming along afterwards to make a face out of grey.
 --
 -- ------- why it writes to green/ and not over the cache path
 --
@@ -17,9 +31,9 @@
 -- importer writes and therefore shadows nothing.  They are still reachable:
 -- Assets.resolve rewrites any "assets/generated/<rel>" through
 -- save/mod-derived/<id>/<rel> whether or not the cache has a file there
--- (src/render/Assets.lua, derivedPath).  main.lua points the player's
--- records at "assets/generated/green/..." when the option says GREEN and
--- leaves them alone when it says RED, and both sets exist the whole time.
+-- (src/render/Assets.lua, derivedPath).  main.lua points the player's art at
+-- "assets/generated/green/..." when the option says GREEN and leaves it
+-- alone when it says RED, and both sets exist the whole time.
 --
 -- ------- the sandbox
 --
@@ -28,14 +42,12 @@
 -- it; tools/check.py fails if the two ever disagree.
 
 return function(ctx)
-  -- lightest first, which is the order ctx.recolor reads.  PAPER stays pure
-  -- white on purpose: the battle back pic is matted on shade 0 at draw time,
-  -- and a near-white would leave a box around the player.
+  -- lightest first, which is the order ctx.recolor reads
   local WILD_GREEN = {
-    { 0xff, 0xff, 0xff },   -- paper
-    { 0x65, 0xba, 0x3f },   -- light  #65ba3f
-    { 0x1e, 0x7a, 0x2b },   -- dark   #1e7a2b
-    { 0x00, 0x00, 0x00 },   -- ink
+    { 0xff, 0xff, 0xff },   -- paper  -- pure white: battle pics matte on it
+    { 0xf8, 0xd8, 0xa8 },   -- skin   #f8d8a8  the face, and the shirt's white
+    { 0x65, 0xba, 0x3f },   -- outfit #65ba3f  the cap and clothes
+    { 0x00, 0x00, 0x00 },   -- ink    -- outline and hair
   }
 
   -- Every picture of the player, by its cache-relative path.
@@ -46,20 +58,28 @@ return function(ctx)
   --   trainer_card/red.png   the front pic: Oak's intro, the card, Hall of Fame
   --   title/player.png       the title screen's standing Red
   --
+  -- The names are the importer's, not this mod's, and a cache that spells one
+  -- differently is a cache this mod cannot recolour -- so every candidate is
+  -- probed rather than assumed, and what was written is logged at the end.
+  -- The hook in main.lua derives its green path from whatever the engine
+  -- hands it, so anything written here is picked up without being named
+  -- twice.
+  --
   -- The old man's demo back pic (battle/oldmanb.png) is deliberately absent:
-  -- he is not the player and the catch tutorial should not turn green.
+  -- he is not the player, and the catch tutorial should not turn green.
   local PICS = {
     "sprites/red.png",
     "sprites/red_bike.png",
     "battle/redb.png",
+    "battle/back/redb.png",
     "trainer_card/red.png",
     "title/player.png",
   }
 
   for _, rel in ipairs(PICS) do
     -- A cache that does not carry one of these is a cache from a version or
-    -- an import that never made it, not a broken install: skip it and let
-    -- main.lua fall back to the vanilla path for that picture.
+    -- an import that never made it, not a broken install: skip it and leave
+    -- that picture as the base game drew it.
     if ctx.exists(rel) then
       ctx.writeImage(ctx.recolor(ctx.readImage(rel), WILD_GREEN),
         "green/" .. rel)

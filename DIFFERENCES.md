@@ -5,11 +5,14 @@ own ledger stays "None currently"; these are this mod's divergences.
 
 ## Art
 
-- **The player is green.** The overworld walker, the `BICYCLE` sheet where
+- **The player wears green.** The overworld walker, the `BICYCLE` sheet where
   the import wrote one, the battle back pic, the front pic that Oak's intro,
   the trainer card and the Hall of Fame share, and the standing figure on the
   title screen are recolored from the player's own imported cache to the Wild
-  Green ramp. `PLAYER = RED` turns all of it off.
+  Green ramp. Only the outfit shade changes: the face keeps a skin tone and
+  the hair and outline stay black. `PLAYER = RED` turns all of it off.
+- **The default name is `GREEN`**, where the game offered `RED`. It is the
+  only thing here that ends up written into a save, and it has its own row.
 - **The title screen reads `WILD GREEN VERSION`.** One continuous ribbon in
   place of the imported pair of fragments. `TITLE RIBBON = OFF` gives back
   the imported art.
@@ -30,8 +33,11 @@ own ledger stays "None currently"; these are this mod's divergences.
   reads grey art through. The mono and inverted display modes do not honour
   `trueColor` (`PaletteFX.honorsTrueColor`), so there the player falls back
   to the baked ramp like any other sprite.
-- **`PLAYER` takes effect on the next launch.** It decides a `sprites`
-  record, and records are settled at load.
+- **`PLAYER` takes effect on the next launch** for the overworld walker,
+  which is a `sprites` record and settled at load. The battle and card pics
+  ride the `player.sprite` hook and change as soon as the pic is re-resolved.
+- **The default name only reaches a new game.** A save that already has a
+  name keeps it, which is the point.
 - **A cache without one of the five pictures leaves that picture alone.**
   The recipe skips what `ctx.exists` says is not there, and `main.lua` only
   repoints a record whose art it actually recolored — so a partial import

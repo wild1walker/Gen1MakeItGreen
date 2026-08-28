@@ -1,74 +1,71 @@
 -- Wild Green
 --
--- The player is green and the title screen says so.  That is the whole mod.
+-- The player is green, he is called GREEN, and the title screen says so.
+-- That is the whole mod.
 --
 -- It is the identity half of the Wild Green cart: the cart pins the two
 -- Gen1Wild bundles for everything a playthrough actually does, and this
 -- supplies the one thing a pinned mod set cannot -- a game that looks like
 -- its own version rather than like Red with things added.
 --
--- ------- the three seams it uses, and why each one
+-- ------- the seams it uses, and why each one
 --
---   sprites            the overworld walker.  A record, so it is decided at
---                      load: PLAYER takes effect on the next launch.
---   field.playerPics   the battle back pic and the front pic Oak's intro,
---                      the trainer card and the Hall of Fame share.
---   field.boot.title   the title screen's standing Red, and the version
+--   player.sprite      the battle back pic and the front pic that Oak's
+--                      intro, the trainer card and the Hall of Fame share.
+--                      A HOOK, not a registry write: those paths are not in
+--                      data.field at all.  Sprites.playerPath resolves them
+--                      through FieldDefaults.fieldValue, so
+--                      `field:get("playerPics")` hands back nothing and a
+--                      patch built from it silently patches nothing -- which
+--                      is exactly what 1.0.0 did, and why the player stayed
+--                      red everywhere except the overworld.  The hook runs
+--                      over the ALREADY-RESOLVED path, so it needs no guess
+--                      about where the vanilla art lives.
+--   sprites            the overworld walker.  A real record, so a patch does
+--                      land -- and being a record it is decided at load, so
+--                      PLAYER takes effect on the next launch.
+--   field.boot.title   the title screen's standing figure, and the version
 --                      ribbon.  boot.title is the mod-reachable half of
 --                      field.title, which the field schema does not expose.
+--   field.boot         playerName, so the game offers GREEN where it used to
+--                      offer RED.
 --   palettes LOGO1     the SGB palette the title's ribbon band wears.
 --
--- None of the green pixels are here.  Every recolored picture is written by
+-- None of the green pixels are here.  Every recoloured picture is written by
 -- transforms.lua out of the player's own imported cache, under a "green/"
--- prefix that shadows nothing, and this file points records at it.  Read
--- that file first: it explains why the prefix exists and what it buys.
---
--- ------- what PLAYER = RED still changes
---
--- Nothing about the character, which is the point.  The ribbon stays "WILD
--- GREEN VERSION" and the band stays green either way: that is the game's
--- name, not the character's outfit, and a cart called Wild Green that boots
--- to "Red Version" is a cart with the label peeled off.  TITLE RIBBON is
--- the switch for people who want the vanilla ribbon back.
+-- prefix that shadows nothing, and this file points the art at it.  Read
+-- that file first: it explains the prefix, and why shade 2 is the face.
 
 return function(mod)
   local CACHE = "assets/generated/"
   local GREEN = CACHE .. "green/"
 
-  -- The Wild Green four, lightest first.  A copy of the ramp in
-  -- transforms.lua, which cannot be imported from -- tools/check.py fails
-  -- the build if the two drift apart.  Only shades 2 and 3 are green; 1 and
-  -- 4 are the paper and ink every palette in the engine shares.
-  local WILD_GREEN = {
+  -- The ribbon band is lettering on white, not a sprite, so it does not use
+  -- the character ramp -- that one lives in transforms.lua, which is where
+  -- the character is actually recoloured.  It gets its own four, and both
+  -- greens are dark enough to read as ink at 8px: 1.0.0 lent it the
+  -- character's light green and it washed out on the title screen.
+  local WILD_GREEN_TITLE = {
     { 0xff, 0xff, 0xff },
-    { 0x65, 0xba, 0x3f },
-    { 0x1e, 0x7a, 0x2b },
+    { 0x2e, 0x8b, 0x3a },
+    { 0x14, 0x57, 0x1f },
     { 0x00, 0x00, 0x00 },
   }
 
-  -- Exactly the set transforms.lua recolors, keyed the way a record names
-  -- them.  A picture that is not in here has no green counterpart on disk,
-  -- so pointing a record at one would draw nothing at all.
-  local RECOLORED = {
-    ["sprites/red.png"] = true,
-    ["sprites/red_bike.png"] = true,
-    ["battle/redb.png"] = true,
-    ["trainer_card/red.png"] = true,
-    ["title/player.png"] = true,
-  }
-
   mod.options:define({
-    -- The character, and the only thing here a player is likely to want
-    -- both ways: GREEN is what the cart is for, RED is the vanilla art
-    -- untouched.  A record decides the overworld walker, so this one lands
-    -- on the next launch rather than mid-step.
+    -- The character, and the only thing here a player is likely to want both
+    -- ways: GREEN is what the cart is for, RED is the vanilla art untouched.
+    -- The overworld walker is a record, so this lands on the next launch;
+    -- the battle and card pics follow the hook and change immediately.
     { key = "player", type = "choice", label = "PLAYER",
       choices = { { "GREEN", "green" }, { "RED", "red" } },
       default = "green" },
-    -- The title screen's version ribbon and the band it sits in.  Off gives
-    -- back the imported ribbon and the imported band colour, which is to
-    -- say the title screen the base game booted to.
+    -- The title screen's version ribbon and the band it sits in.
     { key = "ribbon", type = "toggle", label = "TITLE RIBBON",
+      default = true },
+    -- The name the game offers before you type one.  Its own row because a
+    -- default name is the one thing here that ends up written into a save.
+    { key = "name", type = "toggle", label = "DEFAULT NAME GREEN",
       default = true },
   })
 
@@ -80,21 +77,23 @@ return function(mod)
     return value
   end
 
-  -- The green twin of a cache path, or nil when there is not one.
+  local green = option("player", "green") == "green"
+
+  -- The green twin of a cache path, or nil when the path is not one.
   --
-  -- The nil is the useful half.  The entry chunk runs before the merge, so
-  -- what a registry hands back here is the pristine vanilla record -- but a
-  -- record whose art the import never wrote, or that a later mod means to
-  -- replace, is one we have no green for and should not touch.
+  -- No whitelist of filenames.  transforms.lua recolours what the cache
+  -- actually has, and this turns whatever path the engine resolved into the
+  -- matching derived one, so the two halves cannot disagree about a name.
   local function greenOf(path)
     if type(path) ~= "string" then return nil end
     local rel = path:match("^" .. CACHE .. "(.+)$")
-    if rel and RECOLORED[rel] then return GREEN .. rel end
-    return nil
+    -- Already ours, or already somebody else's: leave it where it points.
+    if not rel or rel:match("^green/") then return nil end
+    return GREEN .. rel
   end
 
   -- Registry writes are pcall'd one at a time rather than in a block: a
-  -- schema that has moved under us should cost the picture it names and not
+  -- schema that has moved under us should cost the thing it names and not
   -- the four that were fine.
   local function try(what, fn)
     local ok, problem = pcall(fn)
@@ -106,78 +105,97 @@ return function(mod)
 
   -- ------- the character
 
-  if option("player", "green") == "green" then
-    -- Every sprite record drawn from a picture we recolored, which is
-    -- SPRITE_RED and -- where the import wrote one -- the BICYCLE sheet.
-    -- Found by image rather than by id so a name this mod guessed wrong is
-    -- simply not matched instead of being patched into a broken record.
-    try("sprites", function()
-      for id, def in mod.content.sprites:each() do
-        local green = type(def) == "table" and greenOf(def.image)
-        if green then
-          -- trueColor keeps the overworld's OBP bake off it.  Without it
-          -- the palette pass would read our green through the same
-          -- red-channel shade buckets it reads grey art through and remap
-          -- it to something else; with it, SpriteRenderer:resolveImage
-          -- hands the image over as drawn (src/render/SpriteRenderer.lua,
-          -- liveTrueColor).
-          mod.content.sprites:patch(id, { image = green, trueColor = true })
-        end
-      end
+  if green then
+    -- The battle back pic, and the front pic Oak's intro, the trainer card
+    -- and the Hall of Fame share.  ctx.demo is the catch tutorial's old man
+    -- and ctx.oakDemo is Yellow's PROF.OAK -- neither is the player, and
+    -- neither should turn green.
+    mod.hooks:wrap("player.sprite", function(next, path, ctx)
+      path = next(path, ctx)
+      if ctx.demo or ctx.oakDemo then return path end
+      local swapped = greenOf(path)
+      if not swapped then return path end
+      -- Drawn as written: without this the palette pass reads our green
+      -- through the same red-channel shade buckets it reads grey art
+      -- through and remaps it to something else entirely.
+      ctx.trueColor = true
+      return swapped
     end)
 
-    -- The battle back pic and the front pic.  demoBack is the catch
-    -- tutorial's old man and oakBack is Oak: neither is the player, and
-    -- neither is in RECOLORED, so greenOf declines them on its own.
-    try("field.playerPics", function()
-      local pics = mod.content.field:get("playerPics")
-      if type(pics) ~= "table" then return end
-      local patch = {}
-      for _, key in ipairs({ "back", "front" }) do
-        local green = greenOf(pics[key])
-        if green then patch[key] = green end
-      end
-      if next(patch) then
-        mod.content.field:patch("playerPics", patch)
+    -- Every sprite record drawn from cache art: SPRITE_RED and, where the
+    -- import wrote one, the BICYCLE sheet.  Found by image rather than by id
+    -- so a name this mod guessed wrong is simply not matched.  A walker
+    -- another mod has already reskinned points outside the cache, so
+    -- greenOf declines it and this does not fight over it.
+    try("sprites", function()
+      for id, def in mod.content.sprites:each() do
+        local image = type(def) == "table" and def.image
+        if type(image) == "string" and image:match("red") then
+          local swapped = greenOf(image)
+          if swapped then
+            mod.content.sprites:patch(id, { image = swapped, trueColor = true })
+          end
+        end
       end
     end)
   end
 
-  -- ------- the title screen
+  -- ------- the name and the title screen
+  --
+  -- Both live under field.boot, and they go in as ONE patch.  Two calls
+  -- would be two writes to the same id, and the second is what the merge
+  -- keeps -- which quietly cost the default name when this was written as
+  -- two.
 
-  -- The standing Red on the title is not playerPics; TitleState reads it off
-  -- field.title.player and falls back to the cache path.  It follows PLAYER
-  -- because it is the character, not the branding.
-  local titlePatch = {}
-  if option("player", "green") == "green" then
-    titlePatch.player = GREEN .. "title/player.png"
+  local bootPatch, title = {}, {}
+
+  -- GREEN where the game used to offer RED.  It follows the character: a
+  -- player who has switched back to the red sprite is playing as RED.
+  if green and option("name", true) then
+    bootPatch.playerName = "GREEN"
+  end
+
+  if green then
+    -- The standing figure on the title is not playerPics; TitleState reads
+    -- it off field.title.player and falls back to the cache path.
+    title.player = GREEN .. "title/player.png"
   end
 
   if option("ribbon", true) then
     -- versionRibbon, not version: the importer's key is the vanilla pair of
     -- fragments the draw pass repositions, and ours is one continuous strip.
-    -- TitleState centres a versionRibbon whole at y=64 (src/ui/TitleState.lua).
-    titlePatch.versionRibbon = mod.assets:path("assets/title/wild_green_version.png")
+    -- TitleState centres a versionRibbon whole at y=64.
+    title.versionRibbon =
+      mod.assets:path("assets/title/wild_green_version.png")
   end
 
-  if next(titlePatch) then
-    try("field.boot.title", function()
-      mod.content.field:patch("boot", { title = titlePatch })
+  if next(title) then bootPatch.title = title end
+
+  if next(bootPatch) then
+    try("field.boot", function()
+      mod.content.field:patch("boot", bootPatch)
     end)
   end
 
   if option("ribbon", true) then
-    -- The ribbon art is grey, because the band it lands in is an SGB
-    -- palette zone: TitleState:sgbPalettes colours tile rows 8-9 with
-    -- LOGO1 and the shader remaps by shade.  So the green comes from here.
+    -- The ribbon art is grey, because the band it lands in is an SGB palette
+    -- zone: TitleState:sgbPalettes colours tile rows 8-9 with LOGO1 and the
+    -- shader remaps by shade.  So the green comes from here.
     --
     -- This is the one thing in the mod that does not reach every display
-    -- mode.  PaletteFX.pal short-circuits every name to the boot-ROM
-    -- palette under OG RED, and reads data/palettes_gbc under ADVANCED, so
-    -- in those two the band wears the mode's own colour and the lettering
-    -- is red.  It is a registry record only in SGB.  DIFFERENCES.md says so.
+    -- mode.  PaletteFX.pal short-circuits every name to the boot-ROM palette
+    -- under OG RED, and reads data/palettes_gbc under ADVANCED, so in those
+    -- two the band wears the mode's own colour and the lettering is red.
+    -- DIFFERENCES.md says so.
     try("palettes.LOGO1", function()
-      mod.content.palettes:override("LOGO1", WILD_GREEN)
+      mod.content.palettes:override("LOGO1", WILD_GREEN_TITLE)
     end)
   end
+
+  -- One line a player can quote back when a picture stays red.  The recipe
+  -- only recolours what the cache actually carries, and which pictures those
+  -- are is the difference between "this mod is broken" and "your import
+  -- never wrote that file".
+  mod.log:info("player=%s ribbon=%s -- recoloured art is read from %s",
+    green and "GREEN" or "RED", tostring(option("ribbon", true)), GREEN)
 end
