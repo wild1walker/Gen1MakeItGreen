@@ -81,6 +81,11 @@ WILD GREEN
   it follows `PLAYER`: switch the character back to red and the names go
   back with him.
 
+**Relaunch after updating.** The recoloured pictures are written once, when
+the transform runs, and the engine caches each image by its resolved path
+for the session. A version installed over a running game shows the old
+pictures until the next launch.
+
 ## No green pixel ships
 
 The player's four pictures are the vanilla ones, so this mod may not ship
