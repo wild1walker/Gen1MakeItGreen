@@ -2,7 +2,48 @@
 
 All notable changes to this mod are recorded here, newest first.
 
-## [1.1.1] - unreleased
+## [1.1.2] - unreleased
+
+### Fixed
+
+- **His lips were green.** Red's overworld mouth is one block of the *cap's*
+  colour sitting in the middle of his face, so a flat shade remap paints it
+  with the clothes. It cannot be told apart by shade, because it is the same
+  shade — only by where it sits. A shade-3 pixel with skin on both sides of
+  it in the same row is enclosed by face and is not clothing; the cap and the
+  clothes are bounded by black, never by skin, so they are never caught by
+  it. `ctx` has no per-pixel verb, so this reaches for ImageData's own
+  `getPixel`/`mapPixel` — one step past the documented surface, and therefore
+  `pcall`'d: if those are ever missing the picture falls back to the plain
+  remap and comes out exactly as 1.1.1 drew it rather than not at all.
+
+### Added
+
+- **The title screen's standing figure is green**, on a `TITLE FIGURE` row.
+  Not by swapping the pic — there is no `trueColor` seam there, which is what
+  made 1.1.0's attempt come back white and pink. The figure keeps the vanilla
+  grey art and `MEWMON`, its zone palette, is overridden instead. That zone
+  is tile rows 10–17, so the `GAME FREAK` line goes green with him; that is
+  the cost, taken deliberately. The cycling Pokémon is untouched while its
+  art is true-colour — `markVisibleTrueColor` marks the mon and cuts the
+  figure out of it — which holds with any sprite mod on, including the one
+  the cart pins. The row is there to switch back out of it otherwise.
+- **The `player.sprite` hook says what it sees**, once per pic per session:
+  the kind, the side, the resolved path, and whether it swapped. 1.1.1
+  greened the battle back pic and left the trainer card red, and there was no
+  way to tell from outside whether the hook never ran or ran and declined a
+  path shaped differently than expected. This answers that without a
+  debugger.
+
+### Known
+
+- The trainer card's front pic was still red in 1.1.1 and this release does
+  not claim to fix it — it makes the cause visible. The card resolves its pic
+  through `Sprites.playerPath`, which runs the hook, so the log line for
+  `trainer_card/front` will say which path it was handed and why it was
+  declined.
+
+## [1.1.1] - 2026-08-28
 
 Two more from the field, both on 1.1.0's own fixes.
 

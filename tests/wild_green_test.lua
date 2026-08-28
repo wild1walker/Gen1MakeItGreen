@@ -47,16 +47,50 @@ local function chunk(path)
   return loaded()
 end
 
+-- ------- a stand-in for love's ImageData
+--
+-- Only what the recipe reaches for: getDimensions, getPixel, mapPixel.  A
+-- cache entry given as `true` gets none of them, which is how the recipe's
+-- pcall fallback is exercised alongside the real path.
+
+local function makeImageData(rel, rows)
+  local data = { image = rel, rows = rows }
+  function data:getDimensions() return #self.rows[1], #self.rows end
+  function data:getPixel(x, y)
+    local v = self.rows[y + 1][x + 1] / 255
+    return v, v, v, 1
+  end
+  function data:mapPixel(fn)
+    self.out = {}
+    for y = 1, #self.rows do
+      self.out[y] = {}
+      for x = 1, #self.rows[y] do
+        local v = self.rows[y][x] / 255
+        local r, g, b = fn(x - 1, y - 1, v, v, v, 1)
+        self.out[y][x] = { math.floor(r * 255 + .5), math.floor(g * 255 + .5),
+                           math.floor(b * 255 + .5) }
+      end
+    end
+    return self
+  end
+  return data
+end
+
 -- ------- the asset sandbox
 
 -- Everything the recipe is handed, and nothing else: the real ctx has no
 -- require, no love and no io either.
 local function fakeCtx(cache)
   local ctx = { written = {}, read = {} }
-  function ctx.exists(rel) return cache[rel] == true end
+  function ctx.exists(rel) return cache[rel] ~= nil end
   function ctx.readImage(rel)
     ctx.read[#ctx.read + 1] = rel
-    return { image = rel }
+    local pixels = cache[rel]
+    if type(pixels) ~= "table" then
+      -- no per-pixel surface: mouthAware raises, the recipe falls back
+      return { image = rel }
+    end
+    return makeImageData(rel, pixels)
   end
   function ctx.recolor(image, shades)
     return { image = image.image, shades = shades }
@@ -83,6 +117,34 @@ local function runTransform(cache)
   local ctx = fakeCtx(cache)
   chunk(MOD .. "transforms.lua")(ctx)
   return ctx
+end
+
+-- Red's face, in the four grey shades the importer writes: a row of skin
+-- with a shade-3 mouth in the middle of it, over a row of solid shade-3
+-- clothing bounded by black.  The mouth is the outfit's own shade -- that is
+-- the whole problem -- so only where it sits can tell them apart.
+local W, S, O, K = 255, 170, 85, 0
+local FACE = {
+  { K, S, S, S, S, S, K },
+  { K, S, K, S, K, S, K },   -- eyes
+  { K, S, S, O, S, S, K },   -- the mouth: shade 3, skin either side
+  { K, K, O, O, O, K, K },   -- the collar: shade 3 bounded by black
+}
+
+io.write("transforms.lua -- the mouth\n")
+do
+  local ctx = fakeCtx({ ["sprites/red.png"] = FACE })
+  chunk(MOD .. "transforms.lua")(ctx)
+  local out = ctx.written["green/sprites/red.png"]
+  ok(out ~= nil and out.out ~= nil, "the per-pixel path ran")
+  local px = out and out.out
+  local function hex(c) return ("%02x%02x%02x"):format(c[1], c[2], c[3]) end
+  eq(px and hex(px[3][4]), "f0a363",
+    "the mouth is skin, not green -- it has skin on both sides")
+  eq(px and hex(px[4][3]), "65ba3f",
+    "the collar is still green -- black either side, not skin")
+  eq(px and hex(px[1][2]), "f0a363", "the face is skin")
+  eq(px and hex(px[2][3]), "000000", "an eye stays black")
 end
 
 io.write("transforms.lua\n")
@@ -275,6 +337,15 @@ do
   ok(boot and boot.title and boot.title.version == nil,
     "versionRibbon, not version -- ours is one continuous strip")
 
+  -- The title figure has no per-image seam, so it is coloured by its zone
+  -- palette instead: MEWMON, in the character's own four.
+  local mew = mod.content.palettes.overrides.MEWMON
+  ok(mew ~= nil, "MEWMON is overridden, which is what colours the title figure")
+  eq(mew and ("%02x%02x%02x"):format(mew[2][1], mew[2][2], mew[2][3]),
+    "f0a363", "...with the character's skin")
+  eq(mew and ("%02x%02x%02x"):format(mew[3][1], mew[3][2], mew[3][3]),
+    "65ba3f", "...and the character's outfit green")
+
   ok(mod.content.palettes.overrides.LOGO1 ~= nil, "LOGO1 is overridden")
   local logo = mod.content.palettes.overrides.LOGO1
   eq(logo and ("%02x%02x%02x"):format(logo[3][1], logo[3][2], logo[3][3]),
@@ -313,6 +384,8 @@ do
     "no sprite is repointed: the character is vanilla again")
   ok(mod.hooks.wrapped["player.sprite"] == nil,
     "player.sprite is not even wrapped, so the pics stay vanilla")
+  ok(mod.content.palettes.overrides.MEWMON == nil,
+    "and the title figure is red again with him")
   ok(mod.content.field.patches.boot == nil
      or mod.content.field.patches.boot.playerName == nil,
     "and the default name stays RED")
@@ -323,6 +396,15 @@ do
     "the ribbon still says WILD GREEN VERSION -- it is the game's name")
   ok(mod.content.palettes.overrides.LOGO1 ~= nil,
     "...and the band is still green")
+end
+
+io.write("main.lua -- TITLE FIGURE off\n")
+do
+  local mod = run({ player = "green", ribbon = true, title_figure = false })
+  ok(mod.content.palettes.overrides.MEWMON == nil,
+    "the title figure goes back to the base game's colours")
+  ok(mod.content.palettes.overrides.LOGO1 ~= nil,
+    "...and the ribbon band stays green: the rows are independent")
 end
 
 io.write("main.lua -- TITLE RIBBON off\n")

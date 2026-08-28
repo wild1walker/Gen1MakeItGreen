@@ -41,6 +41,7 @@ from palette import RAMP, TITLE_RAMP, hexof  # noqa: E402
 # (file, the table in it, what tools/palette.py says it must be)
 RAMPS = (
     ("transforms.lua", "local WILD_GREEN", RAMP),
+    ("main.lua", "local WILD_GREEN =", RAMP),
     ("main.lua", "local WILD_GREEN_TITLE", TITLE_RAMP),
 )
 RIBBON = ROOT / "assets" / "title" / "wild_green_version.png"

@@ -84,13 +84,75 @@ return function(ctx)
     "trainer_card/red.png",
   }
 
+  -- ------- the mouth is not clothing
+  --
+  -- Red's overworld mouth is one block of the CAP's colour sitting in the
+  -- middle of his face, so a flat shade remap paints it green: in the field
+  -- that read as green lips.  It cannot be told apart by shade, because it
+  -- IS the outfit shade -- only by where it sits.
+  --
+  -- The rule: a shade-3 pixel with skin on both sides of it in the same row,
+  -- within a few pixels, is enclosed by face and is not clothing.  The cap
+  -- and the clothes are bounded by black, never by skin, so they are never
+  -- caught by it.
+  --
+  -- ctx has no per-pixel verb, so this reaches for ImageData's own getPixel
+  -- and mapPixel on the objects ctx hands over -- the same methods
+  -- AssetTransform.recolor uses internally.  That is one step past the
+  -- documented surface, so the whole thing is pcall'd: if those methods are
+  -- ever not there, the picture falls back to the plain remap and comes out
+  -- exactly as 1.1.1 drew it, green mouth and all, rather than not at all.
+
+  local REACH = 3
+
+  local function shadeOf(r)
+    if r > 0.83 then return 1 end
+    if r > 0.5 then return 2 end
+    if r > 0.17 then return 3 end
+    return 4
+  end
+
+  local function mouthAware(rel)
+    local src = ctx.readImage(rel)
+    local out = ctx.readImage(rel)
+    local w = src:getDimensions()
+
+    local function shadeAt(x, y)
+      if x < 0 or x >= w then return nil end
+      return shadeOf((src:getPixel(x, y)))
+    end
+
+    -- the first shade either side that is not shade 3, within REACH
+    local function neighbour(x, y, step)
+      for d = 1, REACH do
+        local other = shadeAt(x + step * d, y)
+        if other == nil or other ~= 3 then return other end
+      end
+      return nil
+    end
+
+    out:mapPixel(function(x, y, r, g, b, a)
+      if a == 0 then return r, g, b, a end
+      local shade = shadeOf(r)
+      local colour = WILD_GREEN[shade]
+      if shade == 3 and neighbour(x, y, -1) == 2 and neighbour(x, y, 1) == 2 then
+        colour = WILD_GREEN[2]
+      end
+      return colour[1] / 255, colour[2] / 255, colour[3] / 255, a
+    end)
+    return out
+  end
+
   for _, rel in ipairs(PICS) do
     -- A cache that does not carry one of these is a cache from a version or
     -- an import that never made it, not a broken install: skip it and leave
     -- that picture as the base game drew it.
     if ctx.exists(rel) then
-      ctx.writeImage(ctx.recolor(ctx.readImage(rel), WILD_GREEN),
-        "green/" .. rel)
+      local ok, image = pcall(mouthAware, rel)
+      if not ok then
+        image = ctx.recolor(ctx.readImage(rel), WILD_GREEN)
+      end
+      ctx.writeImage(image, "green/" .. rel)
     end
   end
 end

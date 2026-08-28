@@ -26,8 +26,9 @@
 --                      PLAYER takes effect on the next launch.
 --   field.boot.title   the title screen's version ribbon.  boot.title is the
 --                      mod-reachable half of field.title, which the field
---                      schema does not expose.  The standing FIGURE on that
---                      screen is deliberately left alone -- see below.
+--                      schema does not expose.
+--   palettes MEWMON    the title screen's standing figure, which has no
+--                      per-image seam and is coloured by its zone palette.
 --   field.boot         playerName, so the game offers GREEN where it used to
 --                      offer RED.
 --   palettes LOGO1     the SGB palette the title's ribbon band wears.
@@ -41,11 +42,22 @@ return function(mod)
   local CACHE = "assets/generated/"
   local GREEN = CACHE .. "green/"
 
+  -- The character's four, lightest first: paper, skin, outfit, ink.  A copy
+  -- of the ramp in transforms.lua, which cannot be imported from --
+  -- tools/check.py fails the build if the two drift apart.  It is here for
+  -- MEWMON, the title screen's own palette; the recolouring itself is the
+  -- recipe's job.
+  local WILD_GREEN = {
+    { 0xff, 0xff, 0xff },
+    { 0xf0, 0xa3, 0x63 },
+    { 0x65, 0xba, 0x3f },
+    { 0x00, 0x00, 0x00 },
+  }
+
   -- The ribbon band is lettering on white, not a sprite, so it does not use
-  -- the character ramp -- that one lives in transforms.lua, which is where
-  -- the character is actually recoloured.  It gets its own four, and both
-  -- greens are dark enough to read as ink at 8px: 1.0.0 lent it the
-  -- character's light green and it washed out on the title screen.
+  -- the character ramp.  It gets its own four, and both greens are dark
+  -- enough to read as ink at 8px: 1.0.0 lent it the character's light green
+  -- and it washed out on the title screen.
   local WILD_GREEN_TITLE = {
     { 0xff, 0xff, 0xff },
     { 0x2e, 0x8b, 0x3a },
@@ -63,6 +75,10 @@ return function(mod)
       default = "green" },
     -- The title screen's version ribbon and the band it sits in.
     { key = "ribbon", type = "toggle", label = "TITLE RIBBON",
+      default = true },
+    -- The standing figure on the title screen.  Its own row because it is
+    -- the one change here with a visible cost: see the note at the override.
+    { key = "title_figure", type = "toggle", label = "TITLE FIGURE",
       default = true },
     -- The name the game offers before you type one.  Its own row because a
     -- default name is the one thing here that ends up written into a save.
@@ -111,11 +127,31 @@ return function(mod)
     -- and the Hall of Fame share.  ctx.demo is the catch tutorial's old man
     -- and ctx.oakDemo is Yellow's PROF.OAK -- neither is the player, and
     -- neither should turn green.
+    -- Every distinct path this hook is handed, said once.  1.1.1 swapped the
+    -- battle back pic and left the trainer card red, and there was no way to
+    -- tell from outside whether the hook never ran, or ran and declined a
+    -- path that is not shaped the way this expects.  One line per pic per
+    -- session answers that without a debugger.
+    local seen = {}
+    local function note(path, ctx, verdict)
+      if seen[path] then return end
+      seen[path] = true
+      mod.log:info("player.sprite %s/%s -> %s (%s)",
+        tostring(ctx.kind), tostring(ctx.side), tostring(path), verdict)
+    end
+
     mod.hooks:wrap("player.sprite", function(next, path, ctx)
       path = next(path, ctx)
-      if ctx.demo or ctx.oakDemo then return path end
+      if ctx.demo or ctx.oakDemo then
+        note(path, ctx, "left alone: not the player")
+        return path
+      end
       local swapped = greenOf(path)
-      if not swapped then return path end
+      if not swapped then
+        note(path, ctx, "NOT SWAPPED: outside " .. CACHE)
+        return path
+      end
+      note(path, ctx, "green")
       -- Drawn as written: without this the palette pass reads our green
       -- through the same red-channel shade buckets it reads grey art
       -- through and remaps it to something else entirely.
@@ -156,13 +192,6 @@ return function(mod)
     bootPatch.playerName = "GREEN"
   end
 
-  -- The title screen's standing figure stays vanilla, deliberately.
-  -- TitleState bakes the OBJ palette onto it and cuts its rectangle out of
-  -- the true-colour region so the mon behind it keeps its palette, so there
-  -- is no seam to hand it recoloured art through: 1.1.0 tried, and the pic
-  -- came back through the shade buckets as a white-and-pink figure.  The
-  -- ribbon carries the branding on that screen by itself.
-
   if option("ribbon", true) then
     -- versionRibbon, not version: the importer's key is the vanilla pair of
     -- fragments the draw pass repositions, and ours is one continuous strip.
@@ -176,6 +205,36 @@ return function(mod)
   if next(bootPatch) then
     try("field.boot", function()
       mod.content.field:patch("boot", bootPatch)
+    end)
+  end
+
+  -- ------- the title screen's standing figure
+  --
+  -- Not by swapping the pic.  TitleState bakes the OBJ palette onto it and
+  -- cuts its rectangle OUT of the true-colour region on purpose, so the mon
+  -- cycling behind it keeps its palette -- there is no trueColor seam, and
+  -- 1.1.0 proved it: recoloured art handed to that draw came back through
+  -- the shade buckets as a white-and-pink figure.
+  --
+  -- So the figure keeps the vanilla grey art and MEWMON is what colours it.
+  -- MEWMON is the zone palette for tile rows 10-17, which is the figure, the
+  -- cycling Pokemon and the GAME FREAK line, so this is not free:
+  --
+  --   * the copyright line goes green with him.  It is the cost, and it was
+  --     taken deliberately.
+  --   * the cycling Pokemon is untouched while its art is true-colour --
+  --     markVisibleTrueColor marks the mon and cuts the figure out of it, so
+  --     the palette reaches the figure and not the mon.  With a mod like
+  --     Crystal Animated Sprites on, which the cart pins, that always holds.
+  --     Switch every sprite mod off and the title mon goes green too; the
+  --     TITLE FIGURE row is there to switch back out of that.
+  --
+  -- Like LOGO1 below, this is a registry record only under SGB: OG RED
+  -- short-circuits every named palette to the boot-ROM pair and ADVANCED
+  -- reads data/palettes_gbc.
+  if green and option("title_figure", true) then
+    try("palettes.MEWMON", function()
+      mod.content.palettes:override("MEWMON", WILD_GREEN)
     end)
   end
 

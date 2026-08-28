@@ -19,7 +19,8 @@ It works on its own too. Nothing here depends on either bundle.
 | the overworld walker | `SPRITE_RED`, and the `BICYCLE` sheet where the import wrote one | the `sprites` registry |
 | the battle back pic | the one drawn at 2x until "Go!" | the `player.sprite` hook |
 | the front pic | Oak's intro, the trainer card, the Hall of Fame | the `player.sprite` hook |
-| the title screen | the version ribbon only — **not** the standing figure | `field.boot.title` |
+| the title screen | the version ribbon | `field.boot.title` |
+| the title figure | the standing player on that screen | the `MEWMON` palette |
 | the default name | `GREEN` where the game offered `RED` | `field.boot.playerName` |
 
 The two battle pics go through the **hook** rather than a registry write, and
@@ -36,7 +37,7 @@ vanilla art is two fragments the title code repositions. It is drawn by
 grey shades, and the green arrives from the `LOGO1` palette this mod
 overrides — the SGB palette the title's ribbon band wears.
 
-## The three rows
+## The four rows
 
 In the mod manager, or in `OPTION > MODS`:
 
@@ -44,6 +45,7 @@ In the mod manager, or in `OPTION > MODS`:
 WILD GREEN
   PLAYER              GREEN     <- or RED
   TITLE RIBBON        ON
+  TITLE FIGURE        ON
   DEFAULT NAME GREEN  ON
 ```
 
@@ -55,6 +57,9 @@ WILD GREEN
   Off gives back the imported ribbon and the imported band colour. On, the
   title says `WILD GREEN VERSION` whichever colour the character is —
   that is the game's name, not the character's outfit.
+- **`TITLE FIGURE`** colours the standing player on the title screen, and
+  takes the `GAME FREAK` line with it — see below for why the two cannot be
+  separated. Off gives that screen back to the base game.
 - **`DEFAULT NAME GREEN`** is the name offered before you type one. It has a
   row of its own because it is the one thing here that ends up written into
   a save, and it follows `PLAYER`: switch the character back to red and the
@@ -99,15 +104,33 @@ of them, so shade 2 has to be a real skin tone — and the one that works is
 the one measured off the reference, not the one picked from the middle of
 the ramp.
 
-### The title screen's figure is not recoloured
+### The title figure is coloured, not recoloured
 
 `TitleState` bakes the OBJ palette onto that pic and gives it no `trueColor`
 path — `markVisibleTrueColor` cuts the player's rectangle *out* of the
 true-colour region on purpose, so the mon cycling behind him keeps its
 palette. Art handed to that draw comes back through the shade buckets: the
 tan reads as white and the green as whatever colour index 3 happens to be,
-which in the field was pink. There is no seam for it, so the figure stays as
-the base game drew it and the ribbon carries that screen by itself.
+which in the field was pink.
+
+So the figure keeps the vanilla grey art and **`MEWMON`**, its zone palette,
+is overridden instead. That zone is tile rows 10–17, which is not free:
+
+- The **`GAME FREAK` line goes green** with him. That is the cost.
+- The **cycling Pokémon is untouched** while its art is true-colour, because
+  `markVisibleTrueColor` marks the mon and cuts the figure out of it — the
+  palette reaches one and not the other. That holds with any sprite mod on,
+  including the one the cart pins. Switch them all off and the title mon
+  goes green too, which is what the `TITLE FIGURE` row is for.
+
+### The mouth is not clothing
+
+Red's overworld mouth is one block of the *cap's* colour sitting in the
+middle of his face, so a flat shade remap paints it with the clothes — green
+lips. It cannot be told apart by shade, because it is the same shade; only by
+where it sits. A shade-3 pixel with skin on both sides of it in the same row
+is enclosed by face and is not clothing. The cap and the clothes are bounded
+by black, never by skin, so they are never caught by it.
 
 **The title band** is lettering on white, not a sprite, so it gets its own —
 and both greens are dark enough to read as ink at 8px, which the character's
