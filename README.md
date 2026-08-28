@@ -321,7 +321,19 @@ Red's overworld mouth is one block of the *cap's* colour sitting in the
 middle of his face, so a flat shade remap paints it with the clothes — green
 lips. It cannot be told apart by shade, because it is the same shade; only by
 where it sits. A shade-3 pixel with skin on both sides of it in the same row
-is enclosed by face and is not clothing, so it is painted in the lips'
+is enclosed by face and is not clothing.
+
+**In profile that is not true of it.** Read off the walking frames, the
+sideways mouth is a single pixel with skin on one side and the silhouette's
+own outline on the other, so the both-sides test missed it and the lips came
+out green whenever he faced left or right. What is still true there is what
+sits *above*: cheek. The cap is never under skin, and the collar has the
+chin's black above it rather than the chin. The one exception is the hat's
+own bill, which is skin and sits directly over the cap's bottom row, so a
+bill pixel does not count as a face — the test fixture has exactly that
+pixel, with skin beside it too.
+
+Either way it is painted in the lips'
 colour instead. That colour is vanilla's own: Red's mouth is drawn in the
 *cap's* shade, which is why it comes out red and reads as lips at all.
 Painting it skin, as 1.1.2 did, does not fix it so much as delete it. The cap

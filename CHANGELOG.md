@@ -2,6 +2,29 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.18.0] - 2026-08-28
+
+### Fixed
+
+- **Green lips in profile.** The mouth was found by having skin on *both*
+  sides of it in the same row — which is what tells it from the cap and the
+  collar, both bounded by black. Facing left or right that is not true of
+  it: read off the walking frames, the sideways mouth is a single pixel with
+  skin on one side and the silhouette's outline on the other, so the test
+  missed it and the lips stayed green.
+
+  What is still true in profile is what sits *above* the mouth: cheek. The
+  cap is never under skin and the collar has the chin's black above it, so
+  skin above plus skin on one side is enough. The hat's own bill is the
+  exception — it is skin, and it sits directly over the cap's bottom row —
+  so a bill pixel does not count as a face.
+
+### Notes
+
+- Checked against the real sheet, decoded from four walking frames: the rule
+  catches both front mouths, both profile mouths, and **nothing else** in
+  any of the four.
+
 ## [1.17.0] - 2026-08-28
 
 ### Fixed

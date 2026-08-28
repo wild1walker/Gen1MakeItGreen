@@ -142,8 +142,8 @@ local FACE = {
   { S, K, O, O, O, K, S },   -- 10 the hands: small and touching the body,
                              --    but low in the frame, so not a bill
   { K, S, S, S, S, S, K },   -- 11 more face, deep in the frame
-  { K, K, K, K, K, K, K },   -- 12
-  { K, K, K, K, K, K, K },   -- 13
+  { K, S, S, S, K, K, K },   -- 12 the profile: a cheek, and under it a
+  { K, O, S, S, K, K, K },   -- 13 mouth with skin on ONE side only
   { K, K, K, K, K, K, K },   -- 14
   { K, K, K, K, K, K, K },   -- 15
 }
@@ -172,6 +172,11 @@ do
   eq(px and hex(px[11][1]), "f0a363",
     "a hand is skin: small and touching the body, but low in the frame")
   eq(px and hex(px[8][3]), "000000", "an eye stays black")
+  eq(px and hex(px[14][2]), "ec4d29",
+    "the sideways mouth is vanilla's red too -- skin on one side, the "
+    .. "silhouette on the other, and cheek above it")
+  eq(px and hex(px[3][2]), "65ba3f",
+    "the cap's bottom row stays green: the skin above it is the bill")
 end
 
 io.write("transforms.lua -- the trainer art takes the other ramp\n")

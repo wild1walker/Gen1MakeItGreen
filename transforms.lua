@@ -631,6 +631,30 @@ return function(ctx)
     end
     local ball = rel == TITLE_PIC
 
+    -- ------- the mouth, facing down and facing sideways
+    --
+    -- Facing down the mouth has cheek on both sides of it, and that alone
+    -- tells it from the cap and the collar, which are bounded by black.
+    --
+    -- In PROFILE it does not.  Read off the walking frames, the sideways
+    -- mouth is a single pixel of the outfit's shade with skin on one side
+    -- and the silhouette's own outline on the other -- so the both-sides
+    -- test misses it and the lips came out green whenever he faced left or
+    -- right.  What is still true of it there is what is ABOVE it: cheek.
+    -- The cap is never under skin, and the collar has the chin's black
+    -- above it rather than the chin.
+    --
+    -- Except under the hat's own bill, which IS skin, and directly above
+    -- the cap's bottom row -- so a bill pixel does not count as a face.
+    -- The fixture has exactly that pixel in it, with skin beside it too.
+    local function mouthAt(x, y)
+      local left, right = beside(x, y, -1), beside(x, y, 1)
+      if left == 2 and right == 2 then return true end
+      if left ~= 2 and right ~= 2 then return false end
+      if shadeAt(x, y - 1) ~= 2 then return false end
+      return not (isBill[y - 1] and isBill[y - 1][x])
+    end
+
     out:mapPixel(function(x, y, r, g, b, a)
       if a == 0 then return r, g, b, a end
       local s = shade[y][x]
@@ -659,8 +683,8 @@ return function(ctx)
         elseif detail and detail[y] and detail[y][x] then
           colour = SKIN_DARK
         end
-      elseif s == 3 and beside(x, y, -1) == 2 and beside(x, y, 1) == 2 then
-        -- a mouth: the outfit's shade, but enclosed by face
+      elseif s == 3 and mouthAt(x, y) then
+        -- a mouth: the outfit's shade, but sitting in the face
         colour = MOUTH
       elseif s == 2 and isBill[y] and isBill[y][x] then
         colour = BILL
