@@ -136,34 +136,45 @@ blotches on the hat and the knees. The portrait gets the same trick in green,
 and neither of the overworld position rules, because a face-sized rule on
 face-sized art is noise.
 
-### Finding the skin by size and by white
+### Finding the skin by where it sits
 
-Which leaves the face reading as a pale green rather than as skin, and
-`PORTRAIT SKIN` is the way out of that compromise. It took reading the card's
-real shade map back out of the game to find a rule that fits, because shade 2
-there is **three** different things at once:
+Vanilla's ramp on this art is monochrome, so a pixel's shade never says
+whether it is a cheek or a sleeve. Read back out of the game, the card's
+shade 2 is 128 pixels in 43 pieces and at least five different things: the
+face, both hands, the shading inside the cap, the jacket's shoulder
+highlight, and dither on the knees and shoes.
 
-| | | |
-|---|---|---|
-| the skin | the face (22px) and the hands and forearms (11, 8, 6) | solid patches |
-| shading inside a garment | one patch of 19px in the top of the cap | solid, and **bigger than any single hand** |
-| dither | 29 single pixels and a dozen pairs, on the knees and shoes | checkerboarded against shade 3 |
+It cannot be done by size or by how much white is against a patch. Measured
+on the real art:
 
-Size alone cannot do it — the cap's patch outranks every hand. Two rules
-together can:
+| | size | white | outfit | ink |
+|---|---|---|---|---|
+| jacket shoulder | 8 | 3 | 6 | 7 |
+| left hand | 5 | 3 | 5 | 4 |
 
-- **Size.** Dither is a checkerboard, so its 4-connected pieces are one or
-  two pixels. Under six pixels is not a limb.
-- **White.** Shading inside a garment is bounded by that garment and its own
-  outline and touches no white *at all* — the cap's 19px patch has **zero**
-  paper neighbours. Skin sits at the silhouette or against the shirt's white:
-  the face has ten, the hands three to six.
+One pixel apart on every count — any threshold that keeps the hand takes the
+shoulder with it. What separates them is **where they sit**:
 
-Zero against three is the whole margin, which is why the threshold is a small
-count rather than a ratio fitted to one picture. Where nothing qualifies,
-nothing is painted and that picture keeps the flat green — the battle back
-pic is expected to be near that case, since what faces you there is mostly
-his jacket.
+- **The face** is the biggest patch of shade 2 high in the figure that has
+  paper against it. The cap's own shading is a solid patch up there too, and
+  bigger than either hand, but it is sealed inside the cap and touches no
+  paper at all. That is the one thing that tells the two apart.
+- **The hands** are the patches beside the *lower half* of the torso — the
+  biggest mass of ink in the picture, which is his shirt front. The jacket's
+  shoulder is beside the torso too, but above its middle, so it stays with
+  the jacket.
+- **The detail** is small pieces of shade 3 sealed inside skin: the ear, the
+  brow, the line of the mouth. Vanilla draws those in the shade below the
+  skin's own, so painting only shade 2 leaves green freckles on an otherwise
+  skin-coloured face. They take `#ad7547`, the skin's own shadow — which is
+  why there are two skin colours rather than one.
+
+It still fails closed: no face found, and nothing is painted anywhere. The
+battle back pic is that case — there is no face on the back of his head — and
+so is any portrait the rule does not fit.
+
+Run against the real card art, every one of the ten labelled regions comes
+out right: face and both hands skin, cap and jacket and brim and shoes green.
 
 The recipe writes **both** copies of every portrait — `green/` and
 `greenskin/` — and the row picks between two files that already exist, rather

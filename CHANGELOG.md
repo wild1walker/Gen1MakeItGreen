@@ -2,6 +2,43 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.8.0] - 2026-08-28
+
+### Fixed
+
+- **`PORTRAIT SKIN` painted a jacket highlight and only half of each hand.**
+  1.7.0 separated skin from clothing by size and by how much white was
+  against a patch, and that cannot be done. Measured on the real card, the
+  jacket's shoulder highlight is 8 pixels with 3 white, 6 outfit and 7 ink
+  neighbours; the left hand is 5 with 3, 5 and 4. One pixel apart on every
+  count. Any threshold that keeps the hand takes the shoulder.
+
+  It goes by **where things sit** now:
+
+  - the **face** is the biggest patch of shade 2 high in the figure with
+    paper against it — the cap's own shading is a solid patch up there and
+    bigger than either hand, but it is sealed inside the cap and touches no
+    paper at all;
+  - the **hands** are the patches beside the *lower half* of the torso, the
+    biggest mass of ink in the picture; the jacket's shoulder is beside the
+    torso too, but above its middle;
+  - the **detail** is small pieces of shade 3 sealed inside skin — the ear,
+    the brow, the line of the mouth. Vanilla draws those in the shade below
+    the skin's, so painting only shade 2 left green freckles on the face.
+
+### Added
+
+- A second skin colour, `#ad7547`, for that detail. Shade 2 is the light on
+  the skin and shade 3 is its shadow; a face needs both.
+
+### Notes
+
+- Checked against the card's real shade map, region by region: face, both
+  hands and the ear come out skin; cap, jacket shoulder, collar, brim and
+  shoes stay green. All ten labelled regions correct.
+- Every clause is load-bearing — removing the paper test, the waist test,
+  the hand size floor or the detail pass each fails the suite.
+
 ## [1.7.0] - 2026-08-28
 
 ### Fixed

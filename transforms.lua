@@ -62,6 +62,13 @@ return function(ctx)
   -- gives it back its own edge against both.
   local BILL = { 0xe6, 0xf4, 0xdc }
 
+  -- Nor this.  Vanilla draws the shadow on the skin -- the ear, the brow,
+  -- the line of the mouth -- in the shade BELOW the skin's own, which on a
+  -- monochrome ramp is the same shade as the clothes.  Painting only shade 2
+  -- leaves those as green freckles on a skin-coloured face, so the pieces
+  -- of shade 3 sealed inside skin take the skin's own shadow.
+  local SKIN_DARK = { 0xad, 0x75, 0x47 }
+
   -- The trainer art takes a DIFFERENT four, because shade 2 does not mean
   -- the same thing there.
   --
@@ -171,95 +178,200 @@ return function(ctx)
 
   local STEPS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 
-  -- ------- the skin on a portrait, which shade 2 alone cannot tell you
+  -- ------- which parts of a portrait are skin
   --
-  -- Shade 2 on the trainer art is the light for more than one thing, which
-  -- is why 1.2.0's flat skin tone put orange on the cap and why 1.3.0 gave
-  -- up and went monochrome.  Measured off the real art -- the card's shade
-  -- map read back out of the game -- it is 128 pixels in 43 separate
-  -- pieces, and they are three different things:
+  -- Vanilla's ramp on this art is monochrome red -- white, light red, red,
+  -- black -- so nothing about a pixel's SHADE says whether it is a cheek or
+  -- a sleeve.  Read back out of the game, the card's shade 2 is 128 pixels
+  -- in 43 pieces, and it is at least five different things: the face, both
+  -- hands, the shading inside the cap, the highlight on the jacket's
+  -- shoulder, and checkerboard dither on the knees and the shoes.
   --
-  --   * the SKIN.  A few solid patches: the face (22px), and the hands and
-  --     forearms (11, 8, 6).
-  --   * the SHADING INSIDE A GARMENT.  One solid patch of 19px in the top
-  --     of the cap -- bigger than any single hand, so size alone cannot
-  --     tell them apart.
-  --   * DITHER.  Twenty-nine single pixels and a dozen pairs, checkerboarded
-  --     against shade 3 to make a mid-tone on the knees and the shoes.
+  -- 1.7.0 tried to separate them by size and by how much white was against
+  -- them, and it cannot be done that way.  Measured on the real art:
   --
-  -- Two rules, and between them they separate all three:
+  --     region        size  white  outfit  ink
+  --     jacket            8      3       6     7
+  --     left hand         5      3       5     4
   --
-  --   size    dither is a checkerboard, so its pieces are 4-connected
-  --           regions of one or two pixels.  Nothing under SKIN_MIN is skin.
-  --   paper   shading inside a garment is bounded by that garment and its
-  --           outline and touches no white AT ALL -- the cap's 19px patch
-  --           has zero paper neighbours.  Skin sits at the silhouette or
-  --           against the shirt's white: the face has 10, the hands 3 to 6.
+  -- One pixel apart on every count.  Any threshold that keeps the hand
+  -- takes the shoulder with it, which is exactly what shipped.
   --
-  -- The margin between them on the real art is 0 against 3, which is why
-  -- the threshold is a small number rather than a ratio fitted to it.
+  -- What DOES separate them is where they sit relative to the figure, so
+  -- that is what this asks about:
   --
-  -- Where nothing qualifies, nothing is painted and the picture is the
-  -- monochrome green -- the battle BACK pic is expected to be close to that
-  -- case, since most of what faces you there is his jacket.
-  local SKIN_MIN = 6      -- smaller than this is dither, not a limb
-  local SKIN_MAX = 400    -- bigger than this is not skin either
-  local SKIN_PAPER = 2    -- white neighbours: a garment's own shading has 0
+  --   the FACE    the biggest patch of shade 2 high in the figure that has
+  --               paper against it.  The cap's own shading is a solid patch
+  --               up there too -- bigger than either hand -- but it is
+  --               sealed inside the cap and touches no paper at all, which
+  --               is the one thing that tells the two apart.
+  --   the HANDS   the patches beside the lower half of the torso -- the
+  --               biggest mass of ink in the picture, which is his shirt
+  --               front.  The jacket's shoulder is beside the torso too,
+  --               but ABOVE its middle, so it stays with the jacket.
+  --   the DETAIL  small pieces of shade 3 sealed inside skin: the ear, the
+  --               brow, the line of the mouth.  Vanilla draws those in the
+  --               shade below, so painting only shade 2 leaves green
+  --               freckles on an otherwise skin-coloured face.
+  --
+  -- The last one is why there are two skin colours.  Shade 2 is the light
+  -- on the skin and shade 3 is its shadow; a face needs both.
+  --
+  -- Still fails closed: no face found, nothing is painted anywhere and the
+  -- picture is the flat green.  The battle BACK pic is that case -- there is
+  -- no face on the back of his head -- and so is any portrait this rule does
+  -- not fit.
+  local FACE_BAND = 0.40   -- how far down the figure a face may begin
+  local FACE_PAPER = 2     -- paper against it; a garment's shading has none
+  local HAND_MIN = 3       -- smaller than this beside the torso is dither
+  local HAND_REACH = 2     -- rows past the torso a hand may still reach
+  local DETAIL_MAX = 6     -- an ear or a brow, never a garment
 
-  local function skinMask(shade, w, h)
-    -- label every patch of shade 2
-    local region, regions = {}, {}
-    for y = 0, h - 1 do region[y] = {} end
+  -- every 4-connected patch of one shade, and a grid saying which is which
+  local function connected(shade, w, h, want)
+    local id, list = {}, {}
+    for y = 0, h - 1 do id[y] = {} end
     for y = 0, h - 1 do
       for x = 0, w - 1 do
-        if shade[y][x] == 2 and not region[y][x] then
-          local id = #regions + 1
+        if shade[y][x] == want and not id[y][x] then
+          local n = #list + 1
           local pixels, stack = {}, { { x, y } }
-          region[y][x] = id
+          id[y][x] = n
           while #stack > 0 do
             local at = table.remove(stack)
             pixels[#pixels + 1] = at
             for _, step in ipairs(STEPS) do
               local nx, ny = at[1] + step[1], at[2] + step[2]
               if nx >= 0 and nx < w and ny >= 0 and ny < h
-                  and shade[ny][nx] == 2 and not region[ny][nx] then
-                region[ny][nx] = id
+                  and shade[ny][nx] == want and not id[ny][nx] then
+                id[ny][nx] = n
                 stack[#stack + 1] = { nx, ny }
               end
             end
           end
-          regions[id] = pixels
+          list[n] = pixels
+        end
+      end
+    end
+    return list
+  end
+
+  local function bounds(pixels)
+    local top, bottom, left, right
+    for _, at in ipairs(pixels) do
+      local x, y = at[1], at[2]
+      if not top or y < top then top = y end
+      if not bottom or y > bottom then bottom = y end
+      if not left or x < left then left = x end
+      if not right or x > right then right = x end
+    end
+    return top, bottom, left, right
+  end
+
+  -- paper is the ground the figure sits on, whether the import wrote it
+  -- transparent or matted it white
+  local function paperAgainst(pixels, shade, w, h)
+    local n = 0
+    for _, at in ipairs(pixels) do
+      for _, step in ipairs(STEPS) do
+        local nx, ny = at[1] + step[1], at[2] + step[2]
+        if nx >= 0 and nx < w and ny >= 0 and ny < h then
+          local s = shade[ny][nx]
+          if s == 0 or s == 1 then n = n + 1 end
+        end
+      end
+    end
+    return n
+  end
+
+  -- -> the mask of skin, and the mask of the shade-3 detail inside it
+  local function skinMask(shade, w, h)
+    -- the drawn figure, ignoring the ground: "high in the picture" has to
+    -- mean high in HIM, not high in a canvas that is mostly padding
+    local top, bottom
+    for y = 0, h - 1 do
+      for x = 0, w - 1 do
+        local s = shade[y][x]
+        if s ~= 0 and s ~= 1 then
+          if not top then top = y end
+          if y > (bottom or -1) then bottom = y end
+        end
+      end
+    end
+    if not top then return nil, nil end
+    local high = top + (bottom - top + 1) * FACE_BAND
+
+    local light = connected(shade, w, h, 2)
+
+    local face
+    for _, pixels in ipairs(light) do
+      local t = bounds(pixels)
+      if t <= high and paperAgainst(pixels, shade, w, h) >= FACE_PAPER
+          and (not face or #pixels > #face) then
+        face = pixels
+      end
+    end
+    if not face then return nil, nil end
+
+    local skin = {}
+    local function paint(pixels)
+      for _, at in ipairs(pixels) do
+        skin[at[2]] = skin[at[2]] or {}
+        skin[at[2]][at[1]] = true
+      end
+    end
+    paint(face)
+
+    -- the torso: the biggest mass of ink there is
+    local torso
+    for _, pixels in ipairs(connected(shade, w, h, 4)) do
+      if not torso or #pixels > #torso then torso = pixels end
+    end
+    if torso then
+      local vtop, vbot, vleft, vright = bounds(torso)
+      local waist = (vtop + vbot) / 2
+      for _, pixels in ipairs(light) do
+        local t, b, l, r = bounds(pixels)
+        if #pixels >= HAND_MIN and b >= waist and t <= vbot + HAND_REACH
+            and (r < vleft or l > vright) then
+          paint(pixels)
         end
       end
     end
 
-    local mask, found = {}, false
-    for _, pixels in ipairs(regions) do
-      if #pixels >= SKIN_MIN and #pixels <= SKIN_MAX then
-        local paper = 0
+    local detail = {}
+    for _, pixels in ipairs(connected(shade, w, h, 3)) do
+      if #pixels <= DETAIL_MAX then
+        local sealed, touching = true, 0
         for _, at in ipairs(pixels) do
           for _, step in ipairs(STEPS) do
             local nx, ny = at[1] + step[1], at[2] + step[2]
-            if nx >= 0 and nx < w and ny >= 0 and ny < h
-                and shade[ny][nx] == 1 then
-              paper = paper + 1
+            if nx < 0 or nx >= w or ny < 0 or ny >= h then
+              sealed = false
+            else
+              local s = shade[ny][nx]
+              if s == 2 then
+                if skin[ny] and skin[ny][nx] then touching = touching + 1
+                else sealed = false end
+              elseif s == 0 or s == 1 then
+                sealed = false
+              end
             end
           end
         end
-        if paper >= SKIN_PAPER then
-          found = true
+        if sealed and touching > 0 then
           for _, at in ipairs(pixels) do
-            mask[at[2]] = mask[at[2]] or {}
-            mask[at[2]][at[1]] = true
+            detail[at[2]] = detail[at[2]] or {}
+            detail[at[2]][at[1]] = true
           end
         end
       end
     end
-    if not found then return nil end
-    return mask
+
+    return skin, detail
   end
 
-  local function recoloured(rel, field, face)
+  local function recoloured(rel, field, wantSkin)
     local ramp = field and WILD_GREEN or WILD_GREEN_PIC
     local bill = field
     local src = ctx.readImage(rel)
@@ -335,15 +447,20 @@ return function(ctx)
 
     -- only asked for on the skinned copy of a portrait; nil is the answer
     -- that leaves the picture monochrome
-    local skin = (not field) and face and skinMask(shade, w, h) or nil
+    local skin, detail
+    if (not field) and wantSkin then skin, detail = skinMask(shade, w, h) end
 
     out:mapPixel(function(x, y, r, g, b, a)
       if a == 0 then return r, g, b, a end
       local s = shade[y][x]
       local colour = ramp[s]
       if not field then
-        -- the portrait: the ramp, and the face if one was found
-        if skin and skin[y] and skin[y][x] then colour = WILD_GREEN[2] end
+        -- the portrait: the ramp, and the skin if any was found
+        if skin and skin[y] and skin[y][x] then
+          colour = WILD_GREEN[2]
+        elseif detail and detail[y] and detail[y][x] then
+          colour = SKIN_DARK
+        end
       elseif s == 3 and beside(x, y, -1) == 2 and beside(x, y, 1) == 2 then
         -- a mouth: the outfit's shade, but enclosed by face
         colour = MOUTH

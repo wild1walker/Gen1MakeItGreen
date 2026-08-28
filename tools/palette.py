@@ -63,7 +63,14 @@ PIC_RAMP = [PAPER, PIC_LIGHT, OUTFIT, INK]
 # the colour of his cheek and reads as nothing; painting it the cap's green
 # merged it into the hat instead.  A green-tinted white gives it an edge
 # against both.
-EXTRA = {"MOUTH": MOUTH, "BILL": BILL}
+# And this one.  Vanilla draws the shadow on the skin -- the ear, the brow,
+# the line of the mouth -- in the shade BELOW the skin's, which on a
+# monochrome ramp is the same shade as the clothes.  Painting only shade 2
+# leaves those as green freckles on an otherwise skin-coloured face, so the
+# pieces of shade 3 sealed inside skin take the skin's own shadow instead.
+SKIN_DARK = (0xad, 0x75, 0x47)
+
+EXTRA = {"MOUTH": MOUTH, "BILL": BILL, "SKIN_DARK": SKIN_DARK}
 
 # The title ribbon band (LOGO1).  Ink is the lettering; MID is its shadow.
 TITLE_MID = (0x2e, 0x8b, 0x3a)

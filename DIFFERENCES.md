@@ -45,14 +45,17 @@ own ledger stays "None currently"; these are this mod's divergences.
   Animated Sprites off and `ADVANCED` still gets the green bake; turn
   `TITLE FIGURE` off and neither happens.
 
-- **`PORTRAIT SKIN` finds the skin by size and by white.** Shade 2 on the
-  big pictures is three things at once: the skin, the shading inside a
-  garment, and checkerboard dither. A patch under six pixels is dither; a
-  patch with no white anywhere against it is a garment's own shading — the
-  cap's is a solid 19 pixels with zero paper neighbours, bigger than any
-  single hand, which is why size alone will not do it. What is left is the
-  face and the hands. Where nothing qualifies, that picture keeps the flat
-  green; the battle back pic is expected to be near that case. The title
+- **`PORTRAIT SKIN` finds the skin by where it sits, not by its shade.**
+  Vanilla's ramp on the trainer art is monochrome, so shade 2 is the face,
+  both hands, the shading inside the cap, the jacket's shoulder and the
+  dither on the knees, all at once — and on the real art a hand and a
+  shoulder highlight are one pixel apart on size, white, outfit and ink
+  alike. The face is the biggest patch high in the figure with paper against
+  it (the cap's shading is sealed inside the cap and has none); the hands are
+  the patches beside the lower half of the torso (the shoulder is above its
+  middle); small pieces of shade 3 sealed inside skin take the skin's own
+  shadow, so the ear and the brow are not green freckles. No face found and
+  nothing is painted at all — the battle back pic is that case. The title
   screen's standing figure is baked at draw time rather than read from a
   file, so it keeps the flat green either way.
 
