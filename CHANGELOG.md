@@ -2,6 +2,34 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.12.0] - 2026-08-28
+
+### Changed
+
+- **The title screen's figure gets the same skin as the trainer card.** He
+  was the last picture of the player still flat green: `main.lua` baked him
+  from the shade buckets at draw time, and a bake knows nothing about where
+  a face is.
+
+  He is a cache file like any other — `assets/generated/title/player.png` —
+  so the recipe recolours him now, face and ear and hands and all, and
+  `main.lua` hands that draw the derived copy instead of baking one.
+  `TitleState` keeps the path it loaded him from, so there is nothing to
+  guess: the green twin of *that* is what gets drawn, resolved through
+  `Assets.image` like any other generated path. `PORTRAIT SKIN` picks
+  between the two copies there exactly as it does on the card.
+
+  Only under `ADVANCED`. In every other mode his rectangle is painted by
+  shade, so a recoloured file is thrown away before it reaches the screen
+  and `MEWMON` does that work, unchanged. A cache with no such file falls
+  back to the flat bake, which is what 1.11.0 drew.
+
+### Notes
+
+- `1.11.1` is this same change released without its changelog or manifest
+  bump — a doc script failed halfway and the commit went out regardless.
+  `1.12.0` is the one to pin.
+
 ## [1.11.0] - 2026-08-28
 
 ### Fixed

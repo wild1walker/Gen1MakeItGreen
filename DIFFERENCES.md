@@ -54,9 +54,10 @@ own ledger stays "None currently"; these are this mod's divergences.
   the shirt's edge at hip height and ringed by outline. The cap's shading,
   the jacket's shoulder and sleeves, the collar and the shirt's hem each fail
   one of those and stay green. No face found and nothing is painted at all —
-  the battle back pic is that case. The title screen's standing figure is
-  baked at draw time rather than read from a file, so it keeps the flat green
-  either way.
+  the battle back pic is that case. Under `ADVANCED` the title
+  screen's standing figure is drawn from the recipe's own copy of that
+  picture, so he gets the same face, ear and hands; in every other mode his
+  rectangle is painted by shade and `MEWMON` colours him flat.
 
 - **The green band is a registry record only under SGB.** `PaletteFX.pal`
   (`src/render/PaletteFX.lua`) short-circuits every named palette to the
