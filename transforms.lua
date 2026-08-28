@@ -550,16 +550,19 @@ return function(ctx)
       local s = shade[y][x]
       local colour = ramp[s]
       if not field then
-        -- The portrait: the ramp, and the skin if any was found.  WHICH skin
-        -- is the pixel's own shade and nothing else -- the light shade takes
-        -- the skin, the mid shade takes its shadow -- so a hand drawn
-        -- entirely in the mid shade comes out shadowed the way the brow and
-        -- the ear's underside do, and the one light pixel inside it stays
-        -- the highlight vanilla drew there.  Up to 1.10.0 the hands were
-        -- painted flat: found by zone, coloured by zone, and so the only
-        -- skin on the picture that ignored its own shade.
+        -- The portrait: the ramp, and the skin if any was found.  Skin is
+        -- the skin tone; the shadow tone is for the pieces the DETAIL pass
+        -- picked out -- the brow, the mouth, the ear's underside, the temple
+        -- under the hat, and the speck inside a hand.
+        --
+        -- 1.11.0 tried colouring by the pixel's own shade instead, so that a
+        -- hand drawn wholly in the mid shade came out shadowed.  On this art
+        -- that reads as a hand in shadow rather than a hand, and it is not
+        -- what the picture wants: a hand is skin, and only the crease in it
+        -- is the shadow.  Which pieces are shadow is the detail pass's
+        -- answer, not the shade's.
         if skin and skin[y] and skin[y][x] then
-          colour = (s == 3) and SKIN_DARK or WILD_GREEN[2]
+          colour = WILD_GREEN[2]
         elseif detail and detail[y] and detail[y][x] then
           colour = SKIN_DARK
         end

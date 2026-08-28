@@ -185,14 +185,13 @@ which is his shirt front:
   skin. Those take `#ad7547`, the skin's own shadow, so the brow and the
   ear are not green freckles on a skin-coloured face.
 
-**Which** skin a pixel gets is its own shade and nothing else: the light
-shade takes `#f0a363`, the mid shade takes `#ad7547`. So the hands, drawn
-entirely in the mid shade, come out shadowed the way the brow and the ear's
-underside do — nothing is coloured by the zone that found it. The single
-exception is a speck of the light shade sealed *inside* a hand: at six
-pixels a hand is a fist, and a lighter pixel inside a fist reads as the gap
-between two fingers rather than a highlight on it, so it takes the hand's
-own tone and the fist comes out one colour.
+**Which** skin a pixel gets is which pass found it, not its own shade. Skin
+is `#f0a363`; the shadow `#ad7547` is for what the detail pass picks out —
+the brow, the mouth, the ear's underside, the temple under the hat, and the
+speck sealed inside a hand, which is the crease between two fingers rather
+than a highlight on them. A hand itself is skin: 1.11.0 coloured by shade
+instead, which made both hands shadow throughout, and on this art that reads
+as a hand in shadow rather than as a hand.
 
 It still fails closed: no face found, nothing is painted anywhere — not even
 something shaped like a hand. The battle back pic is that case.

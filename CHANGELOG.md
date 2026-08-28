@@ -2,6 +2,20 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.13.0] - 2026-08-28
+
+### Fixed
+
+- **A hand is skin; only the crease in it is the shadow.** 1.11.0 coloured
+  every skin pixel by its own shade, which made both hands shadow throughout
+  — they are drawn wholly in the mid shade. On this art that reads as a hand
+  in shadow rather than as a hand. The ask was one pixel darker, and one
+  pixel is what changes now: the speck sealed inside the right hand.
+
+  Which pieces take the shadow is the detail pass's answer, not the shade's:
+  the brow, the mouth, the ear's underside, the temple under the hat, and
+  that speck. Everything else the skin passes find is the skin tone.
+
 ## [1.12.0] - 2026-08-28
 
 ### Changed
