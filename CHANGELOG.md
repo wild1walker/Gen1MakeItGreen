@@ -2,6 +2,27 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.11.0] - 2026-08-28
+
+### Fixed
+
+- **The hands are the skin's shadow, not flat skin.** They were the only
+  skin on the picture coloured by the zone that found them rather than by
+  their own shade — found as hands, painted `#f0a363`, while every other
+  mid-shade pixel of skin (the brow, the ear's underside, the temple) took
+  `#ad7547`. They are drawn entirely in the mid shade, so they take the
+  shadow now, the same as everything else.
+
+  Which skin a pixel gets is its own shade and nothing else: light shade
+  `#f0a363`, mid shade `#ad7547`.
+
+- **The speck inside the right hand takes the hand's tone.** By shade alone
+  it would be the light one — a highlight — but at six pixels a hand is a
+  fist, and a lighter pixel inside a fist reads as the gap between two
+  fingers, not a highlight on it. It goes in with the shadow, so the fist
+  comes out one colour rather than one pixel of another. It is the one
+  place in the recipe that does not go by shade, and it says so.
+
 ## [1.10.0] - 2026-08-28
 
 ### Fixed

@@ -253,11 +253,15 @@ do
   eq(hex(skin.out[6][4]), "ad7547", "the temple under the hat is skin's shadow")
   eq(hex(skin.out[6][9]), "ad7547", "...on the other side of the brim too")
 
-  -- the hands, which are shade 3, and the highlight inside one
-  eq(hex(skin.out[19][3]), "f0a363", "a hand is skin, out of the mid shade")
-  eq(hex(skin.out[19][11]), "f0a363", "...on both sides")
-  eq(hex(skin.out[21][4]), "f0a363",
-    "a speck of the light shade inside a hand is its highlight, not dither")
+  -- the hands, which are drawn in the mid shade, so they take the skin's
+  -- SHADOW -- the same mapping as the brow and the ear's underside.  Nothing
+  -- about skin is coloured by which zone found it.
+  eq(hex(skin.out[19][3]), "ad7547", "a hand is the skin's shadow, not flat skin")
+  eq(hex(skin.out[19][11]), "ad7547", "...on both sides")
+  eq(hex(skin.out[21][4]), "ad7547",
+    "the light-shade speck inside a hand takes the hand's tone, not its own")
+  eq(hex(skin.out[21][4]), hex(skin.out[19][3]),
+    "...so a fist comes out one colour rather than one pixel of another")
 
   -- and everything that looks like skin and is not
   eq(hex(skin.out[3][5]), "a8dd8a",

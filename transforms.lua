@@ -370,11 +370,18 @@ return function(ctx)
     end
 
     -- the GLINT: a speck of the LIGHT shade sitting inside skin already
-    -- painted.  On a hand drawn entirely in the mid shade that speck is its
-    -- highlight, and leaving it green puts a green pixel in the middle of a
-    -- hand.  It has to run after the hands, and it only ever looks at skin
-    -- this pass has painted -- every other shade-2 speck on the picture is
+    -- painted.  Leaving it green puts a green pixel in the middle of a hand.
+    --
+    -- It takes the hand's own tone rather than the light one its shade would
+    -- otherwise earn, which is the one place this file does not go by shade.
+    -- At six pixels a hand is a fist, and a single lighter pixel inside a
+    -- fist reads as the gap between two fingers, not as a highlight on it --
+    -- so it goes in with the shadow and the hand comes out one colour.
+    --
+    -- It has to run after the hands, and it only ever looks at skin this
+    -- pass has painted: every other light-shade speck on the picture is
     -- dither on the cap or the knees, and there are twenty-eight of those.
+    local glint = {}
     for _, pixels in ipairs(light) do
       if #pixels <= GLINT_MAX then
         local touching, foreign = 0, false
@@ -387,7 +394,9 @@ return function(ctx)
             end
           end
         end
-        if touching >= 2 and not foreign then paint(pixels) end
+        if touching >= 2 and not foreign then
+          glint[#glint + 1] = pixels
+        end
       end
     end
 
@@ -439,6 +448,13 @@ return function(ctx)
             detail[at[2]][at[1]] = true
           end
         end
+      end
+    end
+
+    for _, pixels in ipairs(glint) do
+      for _, at in ipairs(pixels) do
+        detail[at[2]] = detail[at[2]] or {}
+        detail[at[2]][at[1]] = true
       end
     end
 
@@ -529,9 +545,16 @@ return function(ctx)
       local s = shade[y][x]
       local colour = ramp[s]
       if not field then
-        -- the portrait: the ramp, and the skin if any was found
+        -- The portrait: the ramp, and the skin if any was found.  WHICH skin
+        -- is the pixel's own shade and nothing else -- the light shade takes
+        -- the skin, the mid shade takes its shadow -- so a hand drawn
+        -- entirely in the mid shade comes out shadowed the way the brow and
+        -- the ear's underside do, and the one light pixel inside it stays
+        -- the highlight vanilla drew there.  Up to 1.10.0 the hands were
+        -- painted flat: found by zone, coloured by zone, and so the only
+        -- skin on the picture that ignored its own shade.
         if skin and skin[y] and skin[y][x] then
-          colour = WILD_GREEN[2]
+          colour = (s == 3) and SKIN_DARK or WILD_GREEN[2]
         elseif detail and detail[y] and detail[y][x] then
           colour = SKIN_DARK
         end
