@@ -2,6 +2,23 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.17.0] - 2026-08-28
+
+### Fixed
+
+- **The title figure went purple, not red.** Sampling the screen settled it:
+  `#7321a5` and `#ef9c6b` are `MEWMON` straight out of `data/palettes_gbc`.
+  The figure was not Crystal's bake and not a stale image — it was *being
+  palettised*, because nothing marked its rectangle true-colour that frame.
+
+  `markTrueColor` is called from `currentSprite`, and `currentSprite` is
+  exactly what the draw skips while `scrollPhase` is `"ball"`. 1.15.0 set the
+  picture from the draw but deliberately left the mark to `currentSprite`, on
+  the grounds that the marking pass owns it — so in that phase the picture
+  was green and the zone pass painted purple straight over it. The draw marks
+  it now, along with the ball's own rect, which is drawn from the same
+  picture at a `y` of its own and is the whole point of that phase.
+
 ## [1.16.0] - 2026-08-28
 
 ### Fixed

@@ -1049,11 +1049,28 @@ do
 
   -- and the phase that never calls currentSprite at all
   title.skipSprite = true
+  title.ballY = 96
   local before = screen.inner.calls
+  local marks = #screen.marks
   screen.TitleState.draw(title)
   eq(screen.inner.calls, before, "this phase really does skip currentSprite")
   eq(inner_kind(screen.inner.drew), "derived",
     "...and the figure is still green through it")
+
+  -- ...and marked, or the zone pass repaints it MEWMON purple over the top
+  ok(#screen.marks > marks,
+    "the figure's rect is marked true-colour from the draw as well -- "
+    .. "currentSprite is what this phase skips, and it is what marks")
+  local last = screen.marks[#screen.marks]
+  local figure, ball = false, false
+  for i = marks + 1, #screen.marks do
+    local m = screen.marks[i]
+    if m.x == 82 and m.y == 80 then figure = true end
+    if m.x == 82 and m.y == 96 and m.w == 8 and m.h == 8 then ball = true end
+  end
+  ok(figure, "the figure's own rect at 82,80")
+  ok(ball, "and the ball's, which this phase is the whole point of")
+  ok(last ~= nil, "at least one mark was recorded")
 end
 
 io.write("main.lua -- the title figure out of REDPP\n")

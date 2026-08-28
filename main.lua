@@ -477,6 +477,9 @@ return function(mod)
     -- happen whether or not that mod is installed and marking the same rect
     -- twice costs nothing.
     local FIGURE_X, FIGURE_Y = 82, 80
+    -- the ball the engine lifts out of the same picture and throws on a y of
+    -- its own (TitleState: newQuad(0, 16, 8, 8), drawn at 82, self.ballY)
+    local BALL_W, BALL_H = 8, 8
 
     -- the untouched art, for the bake.  The DERIVED copy needs none of
     -- this -- it is a file, found from the path TitleState loaded -- so the
@@ -542,10 +545,26 @@ return function(mod)
         -- two agree about the figure in both directions.
         title.__crystalPlayerRaw = title.__crystalPlayerRaw or title.__wildGreenRaw
         title.__crystalTrainerBaked = true
+        -- ------- and mark the rect, from whichever path got here
+        --
+        -- Without the mark the SGB zone pass repaints that rectangle by
+        -- shade, and under ADVANCED that is MEWMON out of data/palettes_gbc
+        -- -- white, #ef9c6b, #7321a5, black.  A purple figure, whatever
+        -- image is under it.  Crystal marks it from currentSprite, and
+        -- currentSprite is exactly what the draw skips while scrollPhase is
+        -- "ball", so in that phase nothing marked it and the figure went
+        -- purple no matter who had set the picture.  Marking the same rect
+        -- twice in a frame costs nothing; not marking it at all costs this.
         if mark and type(PaletteFX.markTrueColor) == "function" then
           local okDim, w, h = pcall(baked.getDimensions, baked)
           if okDim and w and h then
             pcall(PaletteFX.markTrueColor, FIGURE_X, FIGURE_Y, w, h)
+          end
+          -- and the ball, which is drawn from the same picture at a y of its
+          -- own -- and in that phase it is the only other thing on screen
+          if type(title.ballY) == "number" then
+            pcall(PaletteFX.markTrueColor, FIGURE_X, title.ballY,
+              BALL_W, BALL_H)
           end
         end
       elseif title.__wildGreenBaked then
@@ -587,14 +606,15 @@ return function(mod)
     -- title's animation nothing re-asserts the figure and Crystal's red bake
     -- is what stands.  That is the flash back to the old skin.
     --
-    -- So assert it here too, before the draw reads it.  No true-colour mark
-    -- from this path: the rect is marked from currentSprite, inside the pass
-    -- that owns those marks, and marking again mid-draw is not this mod's
-    -- business.
+    -- So assert it here too, before the draw reads it -- and mark the rect
+    -- from here as well.  1.15.0 left the mark to currentSprite on the
+    -- grounds that the marking pass owns it, and that is precisely the call
+    -- this phase skips: the picture was green and the zone pass painted
+    -- MEWMON purple straight over it.
     local innerDraw = TitleState.draw
     if type(innerDraw) == "function" then
       function TitleState:draw(...)
-        pcall(apply, self, false)
+        pcall(apply, self, true)
         return innerDraw(self, ...)
       end
     end
