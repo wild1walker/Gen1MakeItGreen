@@ -136,30 +136,39 @@ blotches on the hat and the knees. The portrait gets the same trick in green,
 and neither of the overworld position rules, because a face-sized rule on
 face-sized art is noise.
 
-### Finding the face by what is inside it
+### Finding the skin by size and by white
 
-Which leaves the face reading as a pale green rather than as skin — and
-`PORTRAIT SKIN` is the way out of that compromise. Nothing about the *shade*
-can pick the face out, because the shade is the light on every surface. What
-can is what is **inside** it: the face is the only patch of shade 2 with
-**eyes** in it — islands of ink whose every neighbour is that one patch. The
-cap's front, the shirt's shading and the knees have nothing inside them at
-all, and the outline is one ink region that runs off the edge of the art
-rather than an island.
+Which leaves the face reading as a pale green rather than as skin, and
+`PORTRAIT SKIN` is the way out of that compromise. It took reading the card's
+real shade map back out of the game to find a rule that fits, because shade 2
+there is **three** different things at once:
 
-The rule **fails closed**, on purpose. Fewer than two eyes, a patch the wrong
-size, a patch too far down the picture, or *two* patches that both look like
-a face, and it paints nothing — and that picture is the flat green of 1.4.0.
-The worst it can do is nothing, never a blotch, which is what makes it safe
-to ship against art this file never sees. The battle back pic is exactly that
-case: there is no face on the back of his head to find.
+| | | |
+|---|---|---|
+| the skin | the face (22px) and the hands and forearms (11, 8, 6) | solid patches |
+| shading inside a garment | one patch of 19px in the top of the cap | solid, and **bigger than any single hand** |
+| dither | 29 single pixels and a dozen pairs, on the knees and shoes | checkerboarded against shade 3 |
+
+Size alone cannot do it — the cap's patch outranks every hand. Two rules
+together can:
+
+- **Size.** Dither is a checkerboard, so its 4-connected pieces are one or
+  two pixels. Under six pixels is not a limb.
+- **White.** Shading inside a garment is bounded by that garment and its own
+  outline and touches no white *at all* — the cap's 19px patch has **zero**
+  paper neighbours. Skin sits at the silhouette or against the shirt's white:
+  the face has ten, the hands three to six.
+
+Zero against three is the whole margin, which is why the threshold is a small
+count rather than a ratio fitted to one picture. Where nothing qualifies,
+nothing is painted and that picture keeps the flat green — the battle back
+pic is expected to be near that case, since what faces you there is mostly
+his jacket.
 
 The recipe writes **both** copies of every portrait — `green/` and
 `greenskin/` — and the row picks between two files that already exist, rather
 than deciding a recolour. That is what makes it a switch you can flip in a
-menu instead of one that needs a release to undo. Where the rule found no
-face the two copies are identical, so the row is a no-op on that picture
-rather than broken.
+menu instead of one that needs a release to undo.
 
 The title screen's standing figure is not covered by it: that one is baked
 from the grey art at draw time (see below), not read from a file, and it

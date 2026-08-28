@@ -2,6 +2,37 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.7.0] - 2026-08-28
+
+### Fixed
+
+- **`PORTRAIT SKIN` never fired.** 1.5.0 looked for the face by the *eyes*
+  inside it — a patch of shade 2 enclosing small islands of ink. On the real
+  card there are **no** such islands: the art is dithered, and the eyes are
+  part of the outline. The rule failed closed on every picture, exactly as
+  designed, and the row did nothing.
+
+  The rule now comes from the card's real shade map, read back out of the
+  game. Shade 2 there is 128 pixels in 43 pieces and they are three
+  different things: the skin (the face at 22px, the hands and forearms at
+  11, 8, 6), the shading inside the cap (one solid patch of **19px** —
+  bigger than any single hand, so size alone cannot separate them), and
+  dither (29 single pixels checkerboarded against shade 3 on the knees and
+  shoes).
+
+  So: a patch must be at least six pixels — dither is never that — **and**
+  must have at least two white neighbours. Shading sealed inside a garment
+  has none at all; the cap's 19px patch has zero, the face has ten, the
+  hands three to six. Zero against three is the margin, which is why it is a
+  small count rather than a ratio fitted to one picture.
+
+  Run against that real art, the recipe paints 47 pixels: all 22 of the
+  face, both hands, and nothing inside the cap.
+
+  Where nothing qualifies the picture still keeps the flat green. The battle
+  back pic is expected to be near that case; what faces you there is mostly
+  his jacket.
+
 ## [1.6.0] - 2026-08-28
 
 ### Fixed

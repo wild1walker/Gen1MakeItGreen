@@ -171,48 +171,43 @@ return function(ctx)
 
   local STEPS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 
-  -- ------- the face on a portrait, which shade 2 cannot tell you
+  -- ------- the skin on a portrait, which shade 2 alone cannot tell you
   --
-  -- Shade 2 on the 56x56 art is the light for EVERYTHING -- the cap's front,
-  -- the shirt's shading, the knees, the shoes -- so no rule about the shade
-  -- can pick the face out of it, and painting the shade skin is what put
-  -- orange on the hat in 1.2.0.  That is why the portrait went monochrome.
+  -- Shade 2 on the trainer art is the light for more than one thing, which
+  -- is why 1.2.0's flat skin tone put orange on the cap and why 1.3.0 gave
+  -- up and went monochrome.  Measured off the real art -- the card's shade
+  -- map read back out of the game -- it is 128 pixels in 43 separate
+  -- pieces, and they are three different things:
   --
-  -- What CAN pick it out is what is inside it.  The face is the only patch
-  -- of shade 2 with EYES in it: small islands of ink whose every neighbour
-  -- is that one patch.  The cap's front, the shirt and the knees have
-  -- nothing inside them at all, and the outline is one big ink region that
-  -- runs off the edge of the art rather than an island.
+  --   * the SKIN.  A few solid patches: the face (22px), and the hands and
+  --     forearms (11, 8, 6).
+  --   * the SHADING INSIDE A GARMENT.  One solid patch of 19px in the top
+  --     of the cap -- bigger than any single hand, so size alone cannot
+  --     tell them apart.
+  --   * DITHER.  Twenty-nine single pixels and a dozen pairs, checkerboarded
+  --     against shade 3 to make a mid-tone on the knees and the shoes.
   --
-  -- This deliberately fails CLOSED.  Fewer than two eyes, a region the wrong
-  -- size, a region too far down the art, or TWO regions that both look like
-  -- faces, and it returns nothing -- and the picture is the monochrome green
-  -- that is on screen today.  The worst case is no change, never a blotch,
-  -- which is what makes it safe to ship against art this file never sees.
-  local EYE_MAX = 6       -- an island bigger than this is not an eye
-  local EYES = 2          -- and a face has two of them
-  local FACE_MIN = 6      -- smaller than this is a speck, not a face
-  local FACE_MAX = 400    -- bigger than this is the whole shirt
-  local FACE_DEPTH = 0.7  -- how far down the art a face may still begin
+  -- Two rules, and between them they separate all three:
+  --
+  --   size    dither is a checkerboard, so its pieces are 4-connected
+  --           regions of one or two pixels.  Nothing under SKIN_MIN is skin.
+  --   paper   shading inside a garment is bounded by that garment and its
+  --           outline and touches no white AT ALL -- the cap's 19px patch
+  --           has zero paper neighbours.  Skin sits at the silhouette or
+  --           against the shirt's white: the face has 10, the hands 3 to 6.
+  --
+  -- The margin between them on the real art is 0 against 3, which is why
+  -- the threshold is a small number rather than a ratio fitted to it.
+  --
+  -- Where nothing qualifies, nothing is painted and the picture is the
+  -- monochrome green -- the battle BACK pic is expected to be close to that
+  -- case, since most of what faces you there is his jacket.
+  local SKIN_MIN = 6      -- smaller than this is dither, not a limb
+  local SKIN_MAX = 400    -- bigger than this is not skin either
+  local SKIN_PAPER = 2    -- white neighbours: a garment's own shading has 0
 
-  local function faceMask(shade, w, h)
-    -- the art's opaque box, so "high in the picture" means something on a
-    -- pic that is mostly padding
-    local top, bottom
-    for y = 0, h - 1 do
-      for x = 0, w - 1 do
-        if shade[y][x] ~= 0 then
-          if not top then top = y end
-          bottom = y
-          break
-        end
-      end
-    end
-    if not top then return nil end
-    local depth = top + (bottom - top + 1) * FACE_DEPTH
-
-    -- label every patch of shade 2.  Scanning top-down means the first pixel
-    -- of a patch is also its highest, which is the only geometry this needs.
+  local function skinMask(shade, w, h)
+    -- label every patch of shade 2
     local region, regions = {}, {}
     for y = 0, h - 1 do region[y] = {} end
     for y = 0, h - 1 do
@@ -233,71 +228,34 @@ return function(ctx)
               end
             end
           end
-          regions[id] = { pixels = pixels, eyes = 0, top = y }
+          regions[id] = pixels
         end
       end
     end
 
-    -- every island of ink, and the one patch of shade 2 that encloses it.
-    -- Touching the edge of the art, touching paper, touching the outfit, or
-    -- touching two different patches all disqualify it: an eye is
-    -- surrounded by face and by nothing else.
-    local seen = {}
-    for y = 0, h - 1 do seen[y] = {} end
-    for y = 0, h - 1 do
-      for x = 0, w - 1 do
-        if shade[y][x] == 4 and not seen[y][x] then
-          local pixels, stack = {}, { { x, y } }
-          local host, open = nil, false
-          seen[y][x] = true
-          while #stack > 0 do
-            local at = table.remove(stack)
-            pixels[#pixels + 1] = at
-            for _, step in ipairs(STEPS) do
-              local nx, ny = at[1] + step[1], at[2] + step[2]
-              if nx < 0 or nx >= w or ny < 0 or ny >= h then
-                open = true
-              else
-                local s = shade[ny][nx]
-                if s == 4 then
-                  if not seen[ny][nx] then
-                    seen[ny][nx] = true
-                    stack[#stack + 1] = { nx, ny }
-                  end
-                elseif s == 2 then
-                  local id = region[ny][nx]
-                  if host == nil then host = id
-                  elseif host ~= id then open = true end
-                else
-                  open = true
-                end
-              end
+    local mask, found = {}, false
+    for _, pixels in ipairs(regions) do
+      if #pixels >= SKIN_MIN and #pixels <= SKIN_MAX then
+        local paper = 0
+        for _, at in ipairs(pixels) do
+          for _, step in ipairs(STEPS) do
+            local nx, ny = at[1] + step[1], at[2] + step[2]
+            if nx >= 0 and nx < w and ny >= 0 and ny < h
+                and shade[ny][nx] == 1 then
+              paper = paper + 1
             end
           end
-          if not open and host and #pixels <= EYE_MAX then
-            regions[host].eyes = regions[host].eyes + 1
+        end
+        if paper >= SKIN_PAPER then
+          found = true
+          for _, at in ipairs(pixels) do
+            mask[at[2]] = mask[at[2]] or {}
+            mask[at[2]][at[1]] = true
           end
         end
-      end
-    end
-
-    local found
-    for _, r in ipairs(regions) do
-      if r.eyes >= EYES and #r.pixels >= FACE_MIN and #r.pixels <= FACE_MAX
-          and r.top <= depth then
-        -- two patches that both look like a face is not a face found, it is
-        -- a rule that does not fit this picture
-        if found then return nil end
-        found = r
       end
     end
     if not found then return nil end
-
-    local mask = {}
-    for _, at in ipairs(found.pixels) do
-      mask[at[2]] = mask[at[2]] or {}
-      mask[at[2]][at[1]] = true
-    end
     return mask
   end
 
@@ -377,7 +335,7 @@ return function(ctx)
 
     -- only asked for on the skinned copy of a portrait; nil is the answer
     -- that leaves the picture monochrome
-    local skin = (not field) and face and faceMask(shade, w, h) or nil
+    local skin = (not field) and face and skinMask(shade, w, h) or nil
 
     out:mapPixel(function(x, y, r, g, b, a)
       if a == 0 then return r, g, b, a end

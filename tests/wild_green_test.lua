@@ -194,96 +194,87 @@ do
   eq(hex(px[8][3]), "000000", "ink is still ink")
 end
 
-io.write("transforms.lua -- the face on a portrait\n")
+io.write("transforms.lua -- the skin on a portrait\n")
 do
-  -- Shade 2 on a portrait is the light for everything, so nothing about the
-  -- shade says which of it is the face.  What does: the face is the only
-  -- patch of it with EYES in it -- islands of ink whose every neighbour is
-  -- that one patch.  The cap's front, the shirt's shading and the knees
-  -- below have nothing inside them, and the outline runs off the edge of the
-  -- art rather than being an island.
+  -- Shade 2 on the trainer art is three different things at once, measured
+  -- off the real card: the skin (solid patches), the shading inside the cap
+  -- (one solid patch BIGGER than any single hand, so size alone cannot do
+  -- it), and checkerboard dither on the knees (one-pixel pieces).  The
+  -- fixture is that shape.
   local PORTRAIT = {
     { W, W, K, K, K, K, K, K, W, W, W, W },  -- 0  the cap's outline
-    { W, K, O, O, O, O, O, O, K, W, W, W },  -- 1  the cap
-    { W, K, O, O, O, O, O, O, K, W, W, W },  -- 2
-    { W, K, S, S, S, S, S, S, K, W, W, W },  -- 3  the face
-    { W, K, S, K, S, S, K, S, K, W, W, W },  -- 4  two eyes, enclosed by it
-    { W, K, S, S, S, S, S, S, K, W, W, W },  -- 5
-    { W, K, S, S, S, S, S, S, K, W, W, W },  -- 6
-    { W, W, K, K, K, K, K, K, W, W, W, W },  -- 7  the jaw
-    { W, W, K, O, O, O, O, K, W, W, W, W },  -- 8  the shirt
-    { W, W, K, O, S, S, O, K, W, W, W, W },  -- 9  its highlight: shade 2,
-    { W, W, K, O, S, S, O, K, W, W, W, W },  -- 10 and no eyes in it
-    { W, W, K, O, O, O, O, K, W, W, W, W },  -- 11
-    { W, W, W, K, S, S, K, W, W, W, W, W },  -- 12 the knees: shade 2 again
-    { W, W, W, K, K, K, K, W, W, W, W, W },  -- 13
+    { W, K, O, O, O, S, S, O, K, W, W, W },  -- 1  shading INSIDE the cap:
+    { W, K, O, O, O, S, S, O, K, W, W, W },  -- 2  shade 2, and no white
+    { W, K, O, O, O, O, O, O, K, W, W, W },  -- 3  anywhere against it
+    { W, W, K, K, K, K, K, K, W, W, W, W },  -- 4
+    { W, S, S, S, S, S, S, S, W, W, W, W },  -- 5  the face: white either side
+    { W, K, S, S, K, S, K, S, K, W, W, W },  -- 6
+    { W, K, S, S, S, S, S, S, K, W, W, W },  -- 7
+    { W, W, K, K, K, K, K, K, W, W, W, W },  -- 8
+    { W, W, K, O, O, O, O, K, W, W, W, W },  -- 9  the shirt
+    { W, W, K, O, S, S, O, K, W, W, W, W },  -- 10 its shading: sealed in, and
+    { W, W, K, O, O, O, O, K, W, W, W, W },  -- 11 too small either way
+    { W, S, S, S, K, O, O, K, S, S, S, W },  -- 12 the hands, at the sides,
+    { W, S, S, S, K, O, O, K, S, S, S, W },  -- 13 against the white ground
+    { W, W, K, K, K, K, K, K, W, W, W, W },  -- 14
+    { W, W, S, O, S, O, S, W, W, W, W, W },  -- 15 dither: every piece is one
+    { W, W, O, S, O, S, O, W, W, W, W, W },  -- 16 pixel, 4-connected
+    { W, W, K, K, K, K, K, W, W, W, W, W },  -- 17
+    { W, S, S, K, W, W, W, W, W, W, W, W },  -- 18 a shoe's highlight: white
+    { W, K, K, K, W, W, W, W, W, W, W, W },  -- 19 against it, but 2px
   }
 
   local ctx = fakeCtx({ ["trainer_card/red.png"] = PORTRAIT })
   chunk(MOD .. "transforms.lua")(ctx)
-
   local plain = ctx.written["green/trainer_card/red.png"]
   local skin = ctx.written["greenskin/trainer_card/red.png"]
   ok(plain ~= nil and skin ~= nil, "both copies of the portrait are written")
 
   -- the monochrome copy is untouched by any of this
-  eq(hex(plain.out[4][3]), "a8dd8a", "green/ leaves the face the light green")
-  eq(hex(plain.out[10][5]), "a8dd8a", "...and the shirt's highlight with it")
+  eq(hex(plain.out[6][4]), "a8dd8a", "green/ leaves the face the light green")
+  eq(hex(plain.out[13][2]), "a8dd8a", "...and the hands with it")
 
-  -- and the skinned copy paints the face, and only the face
-  eq(hex(skin.out[4][3]), "f0a363", "greenskin/ paints the face skin")
-  eq(hex(skin.out[6][3]), "f0a363", "...all of it, not just the eye row")
-  eq(hex(skin.out[5][4]), "000000", "the eyes stay ink")
-  eq(hex(skin.out[2][3]), "65ba3f", "the cap is still the outfit green")
-  eq(hex(skin.out[10][5]), "a8dd8a",
-    "the shirt's highlight is still the light green -- no eyes in it")
-  eq(hex(skin.out[13][5]), "a8dd8a", "...and so are the knees")
-  eq(hex(skin.out[1][1]), "ffffff", "the ground is still paper")
+  -- and the skinned copy paints the skin, and only the skin
+  eq(hex(skin.out[6][4]), "f0a363", "greenskin/ paints the face skin")
+  eq(hex(skin.out[8][3]), "f0a363", "...all of it, not just the top row")
+  eq(hex(skin.out[13][2]), "f0a363", "a hand takes the skin too")
+  eq(hex(skin.out[14][10]), "f0a363", "...on both sides")
+
+  eq(hex(skin.out[2][6]), "a8dd8a",
+    "the cap's shading keeps the green: no white anywhere against it")
+  eq(hex(skin.out[11][5]), "a8dd8a", "...and so does the shirt's")
+  eq(hex(skin.out[16][3]), "a8dd8a",
+    "dither keeps the green: one pixel is not a limb")
+  eq(hex(skin.out[17][4]), "a8dd8a", "...on either row of it")
+  eq(hex(skin.out[19][2]), "a8dd8a",
+    "a two-pixel highlight against white is still too small to be a limb")
+
+  eq(hex(skin.out[2][4]), "65ba3f", "the cap itself is still the outfit green")
+  eq(hex(skin.out[7][5]), "000000", "an eye stays ink")
+  eq(hex(skin.out[6][1]), "ffffff", "the ground is still paper")
 end
 
-io.write("transforms.lua -- the face rule fails closed\n")
+io.write("transforms.lua -- the skin rule paints nothing rather than guessing\n")
 do
-  -- No eyes, so no face, so the skinned copy is the monochrome one.  This is
-  -- the battle BACK pic's case, and the case of any art the rule does not
-  -- fit: the worst it can do is nothing.
-  local NO_EYES = {
+  -- Nothing solid enough, and nothing against white: the skinned copy is
+  -- the monochrome one.  The battle BACK pic is expected to be near this
+  -- case, since most of what faces you there is his jacket.
+  local NO_SKIN = {
     { W, W, K, K, K, K, K, K, W, W, W, W },
-    { W, K, O, O, O, O, O, O, K, W, W, W },
-    { W, K, S, S, S, S, S, S, K, W, W, W },
-    { W, K, S, S, S, S, S, S, K, W, W, W },
-    { W, K, S, S, S, S, S, S, K, W, W, W },
+    { W, K, O, O, S, S, O, O, K, W, W, W },  -- a big patch, but sealed
+    { W, K, O, O, S, S, O, O, K, W, W, W },  -- inside the garment
+    { W, K, O, O, S, S, O, O, K, W, W, W },
     { W, W, K, K, K, K, K, K, W, W, W, W },
+    { W, W, S, O, S, O, S, W, W, W, W, W },  -- and dither, which is small
   }
-  local ctx = fakeCtx({ ["battle/redb.png"] = NO_EYES })
+  local ctx = fakeCtx({ ["battle/redb.png"] = NO_SKIN })
   chunk(MOD .. "transforms.lua")(ctx)
   local skin = ctx.written["greenskin/battle/redb.png"]
   ok(skin ~= nil, "the skinned copy is still written")
-  eq(hex(skin.out[3][3]), "a8dd8a",
-    "with no eyes to find, nothing is painted skin")
-  eq(hex(skin.out[2][3]), "65ba3f", "and the outfit is untouched")
-end
-
-do
-  -- Two patches that both look like a face is not two faces found, it is a
-  -- rule that does not fit this picture.  It declines rather than guessing.
-  local HEAD = {
-    { W, W, K, K, K, K, K, K, W, W, W, W },
-    { W, K, O, O, O, O, O, O, K, W, W, W },
-    { W, K, S, S, S, S, S, S, K, W, W, W },
-    { W, K, S, K, S, S, K, S, K, W, W, W },
-    { W, K, S, S, S, S, S, S, K, W, W, W },
-    { W, W, K, K, K, K, K, K, W, W, W, W },
-  }
-  local TWO = {}
-  for _ = 1, 2 do
-    for _, row in ipairs(HEAD) do TWO[#TWO + 1] = row end
-  end
-  local ctx = fakeCtx({ ["credits/red.png"] = TWO })
-  chunk(MOD .. "transforms.lua")(ctx)
-  local skin = ctx.written["greenskin/credits/red.png"]
-  eq(hex(skin.out[3][3]), "a8dd8a",
-    "two candidate faces means none is painted")
-  eq(hex(skin.out[9][3]), "a8dd8a", "...on either of them")
+  eq(hex(skin.out[3][5]), "a8dd8a",
+    "a shade-2 patch with no white against it is garment shading, not skin")
+  eq(hex(skin.out[6][3]), "a8dd8a", "...and dither is still dither")
+  eq(hex(skin.out[2][3]), "65ba3f", "the outfit is untouched")
 end
 
 io.write("transforms.lua -- every picture is covered\n")
