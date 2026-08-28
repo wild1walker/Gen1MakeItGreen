@@ -635,11 +635,25 @@ do
   eq(boot and boot.playerName, "GREEN",
     "the game offers GREEN where it used to offer RED")
   local presets = boot and boot.namePresets and boot.namePresets.player
-  eq(presets and presets[1], "GREEN", "the naming menu's first name is GREEN")
-  eq(presets and presets[2], "WILD", "...the second is WILD, where ASH was")
-  eq(presets and presets[3], "JACK", "...and the third is vanilla's own")
-  ok(boot and boot.namePresets and boot.namePresets.rival == nil,
-    "the rival's three are not touched -- field:patch deep-merges")
+  eq(presets and presets[1], "WILD", "the player's list reads WILD")
+  eq(presets and presets[2], "GREEN", "...GREEN")
+  eq(presets and presets[3], "VERSION", "...VERSION, down the cursor")
+  local rival = boot and boot.namePresets and boot.namePresets.rival
+  eq(rival and rival[1], "Thanks", "the rival's list reads Thanks")
+  eq(rival and rival[2], "For", "...For")
+  eq(rival and rival[3], "Playing!", "...Playing!")
+  -- A preset is picked from a menu, never typed, so the seven-character
+  -- typing limit does not apply -- but the BOX does.  Menu widens to
+  -- `widest + 3` tiles and the intro box asks for 11, so nine characters
+  -- would grow the frame off vanilla's width.  Ten would not fit the save
+  -- either (GenSave writes at most NAME_LENGTH - 1).
+  for _, list in ipairs({ presets, rival }) do
+    for _, name in ipairs(list or {}) do
+      ok(#name >= 1 and #name <= 8,
+        ("%q is 1-8 characters, so the naming box keeps vanilla's width")
+          :format(name))
+    end
+  end
 end
 do
   local mod = run({ player = "green", ribbon = true, name = false })

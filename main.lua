@@ -276,16 +276,36 @@ return function(mod)
   -- Two things, because the game asks twice.  playerName is what a save
   -- gets when no name is chosen (SaveData: `boot.playerName or "RED"`).
   -- namePresets is the list on the naming screen's first page, under
-  -- NEW NAME -- the engine's own is RED / ASH / JACK, and a boot that does
-  -- not set it gets that as a fallback (OakSpeech.namePresets).  RED
-  -- becomes GREEN and ASH becomes WILD; JACK is vanilla's and stays.
+  -- NEW NAME -- the engine's own is RED / ASH / JACK for the player and
+  -- BLUE / GARY / JOHN for the rival, and a boot that does not set it gets
+  -- those as a fallback (OakSpeech.namePresets).  The two lists read down
+  -- the cursor: WILD GREEN VERSION, then Thanks For Playing!
   --
-  -- Only `player` is named here.  field:patch deep-merges (Registry.fold ->
-  -- Merge.deepMerge), so the rival's own three are left exactly as the
-  -- import wrote them rather than overwritten with a copy of Red's.
+  -- playerName stays GREEN rather than following the list's first entry.
+  -- It is the name a save takes when the naming step never runs, and a
+  -- green player called GREEN is the sensible one of the three.
+  --
+  -- Three things make the rival's list safe, and all three are worth
+  -- writing down because none of them is obvious:
+  --
+  --   * "Playing!" is eight characters where a TYPED name stops at seven
+  --     (OakSpeech.nameLen).  A preset is not typed: NamingScreen:enter
+  --     calls onDone(preset) straight from the menu, so maxLen never sees
+  --     it, and the save's name field is eleven bytes (GenSave.NAME_LENGTH)
+  --     with the encoder writing at most ten.  It fits with room over.
+  --   * Eight is also exactly what the box holds.  Menu widens itself to
+  --     `widest + 3` tiles and the intro box asks for 11, so an 8-glyph
+  --     label lands on 11 and the frame keeps vanilla's width.  A ninth
+  --     character would silently grow the box.
+  --   * Lowercase and "!" are all in the charmap
+  --     (src/save_convert/data/charmap.lua), so they encode into a save and
+  --     round-trip out of it as themselves rather than as "?".
   if green and option("name", true) then
     bootPatch.playerName = "GREEN"
-    bootPatch.namePresets = { player = { "GREEN", "WILD", "JACK" } }
+    bootPatch.namePresets = {
+      player = { "WILD", "GREEN", "VERSION" },
+      rival = { "Thanks", "For", "Playing!" },
+    }
   end
 
   if option("ribbon", true) then

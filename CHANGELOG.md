@@ -2,6 +2,38 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.19.0] - 2026-08-28
+
+### Changed
+
+- **Both naming lists.** The `NEW NAME` page offers three names for the
+  player and three for the rival, and each list now reads as a sentence
+  straight down the cursor: **WILD / GREEN / VERSION**, and
+  **Thanks / For / Playing!** Vanilla's are RED / ASH / JACK and
+  BLUE / GARY / JOHN; the mod previously replaced only the player's, with
+  GREEN / WILD / JACK.
+
+  The default name is still `GREEN`, not `WILD`. `field.boot.playerName` is
+  what a save takes when the naming step never runs, and of the three that
+  is the one that describes the character.
+
+  Three things make `Playing!` safe at eight characters, and none of them is
+  obvious from the list:
+
+  - A **typed** name stops at seven (`OakSpeech.nameLen`). A preset is not
+    typed — `NamingScreen:enter` hands it to `onDone` straight from the
+    menu, so `maxLen` never sees it, and the save's name field holds ten
+    characters before its terminator (`GenSave.NAME_LENGTH`).
+  - Eight is also exactly what the **box** holds. `Menu` widens itself to
+    `widest + 3` tiles and the intro box asks for 11, so an 8-glyph label
+    lands on 11 and the frame keeps vanilla's width. A ninth character would
+    silently grow it.
+  - Lowercase and `!` are both in the charmap, so they encode into a save
+    and come back out as themselves rather than as `?`.
+
+  A test asserts the 1–8 bound on every entry in both lists, so a future
+  name cannot quietly widen the box.
+
 ## [1.18.0] - 2026-08-28
 
 ### Fixed
