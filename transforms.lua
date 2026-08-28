@@ -577,24 +577,111 @@ return function(ctx)
   }
   local BALL_X, BALL_Y, BALL_W, BALL_H = 0, 16, 8, 8
 
-  -- -> a mask of tones for a picture that carries a table, or nil
+  -- ------- reading a table against a picture
   --
-  -- Two pictures do.  The guard is the same for both: every entry has to
-  -- find the shade it was authored against, and TABLE_MIN is how much of a
-  -- table has to match before any of it is believed.
-  local function tableMask(spec, shade, w, h)
-    local mask, found, total = {}, 0, 0
+  -- Two pictures carry tables.  The guard is the same for both: every entry
+  -- has to find the shade it was authored against, and TABLE_MIN is how much
+  -- of a table has to match before any of it is believed.
+  --
+  -- ------- and why the coordinates are not absolute any more
+  --
+  -- A table is a list of coordinates, so it only ever found the art it was
+  -- drawn against sitting exactly where it sat.  A cache holding the SAME
+  -- sprite one pixel over -- an importer that pads differently, a rip on a
+  -- larger sheet, a canvas that is not 32x32 -- failed all 33 guards at once
+  -- and the picture fell through to the flat ramp.  That is the whole of
+  -- what a table could not reach, and it is placement, not pixels.
+  --
+  -- So the table is matched at its own coordinates FIRST -- which is exactly
+  -- what this did before, so art that worked keeps working, byte for byte --
+  -- and only if that fails is it slid over the picture looking for the
+  -- offset it does fit at.
+  --
+  -- It cannot wander into painting something else.  A run has to clear the
+  -- same TABLE_MIN it always did, which on the back pic means 30 of 33
+  -- entries landing on the right shade across THREE different shades in one
+  -- fixed arrangement -- a flat region cannot do that, whatever it is made
+  -- of.  And the best offset has to be the ONLY best one: two offsets
+  -- reading equally well is an ambiguous picture, and an ambiguous picture
+  -- is left alone rather than painted at the first of them.
+  --
+  -- What is still out of reach is art whose PIXELS differ, and that is on
+  -- purpose.  There is no rule underneath this to fall back to -- on the
+  -- back pic the hand cannot be told from the sleeve's own white by size,
+  -- by height, or by reaching past the body, because the sleeve does all
+  -- three; only by where it sits.  A rule tuned tight enough to separate
+  -- them would BE this table, and would fail open on art it has never seen
+  -- instead of quietly leaving it alone.  Failing closed is the feature.
+  local function parseTable(spec)
+    local entries, minRow, maxRow, minCol, maxCol
+    entries = {}
     for row, col, want, tone in spec:gmatch("(%d+)%.(%d+)%.(%d+)%.(%d+)") do
-      row, col, want, tone = tonumber(row), tonumber(col), tonumber(want), tonumber(tone)
-      total = total + 1
-      if row < h and col < w and shade[row][col] == want then
+      row, col = tonumber(row), tonumber(col)
+      entries[#entries + 1] = { row, col, tonumber(want), tonumber(tone) }
+      if not minRow or row < minRow then minRow = row end
+      if not maxRow or row > maxRow then maxRow = row end
+      if not minCol or col < minCol then minCol = col end
+      if not maxCol or col > maxCol then maxCol = col end
+    end
+    return entries, minRow, maxRow, minCol, maxCol
+  end
+
+  -- how many of a table's entries find their shade with the table shifted
+  -- by (dy, dx); an entry off the edge simply does not match
+  local function scoreTable(entries, shade, w, h, dy, dx)
+    local found = 0
+    for i = 1, #entries do
+      local e = entries[i]
+      local row, col = e[1] + dy, e[2] + dx
+      if row >= 0 and row < h and col >= 0 and col < w
+          and shade[row][col] == e[3] then
         found = found + 1
-        mask[row] = mask[row] or {}
-        mask[row][col] = TABLE_TONE[tone]
       end
     end
-    if total == 0 or found / total < TABLE_MIN then return nil end
+    return found
+  end
+
+  -- the tones of the entries that DID match, which is the mask; an entry
+  -- that missed its shade paints nothing, as it never did
+  local function paintTable(entries, shade, w, h, dy, dx)
+    local mask = {}
+    for i = 1, #entries do
+      local e = entries[i]
+      local row, col = e[1] + dy, e[2] + dx
+      if row >= 0 and row < h and col >= 0 and col < w
+          and shade[row][col] == e[3] then
+        mask[row] = mask[row] or {}
+        mask[row][col] = TABLE_TONE[e[4]]
+      end
+    end
     return mask
+  end
+
+  -- -> a mask of tones for a picture that carries a table, or nil
+  local function tableMask(spec, shade, w, h)
+    local entries, minRow, maxRow, minCol, maxCol = parseTable(spec)
+    local total = #entries
+    if total == 0 then return nil end
+
+    -- where it was authored, which is where it has always looked
+    if scoreTable(entries, shade, w, h, 0, 0) / total >= TABLE_MIN then
+      return paintTable(entries, shade, w, h, 0, 0)
+    end
+
+    -- the same figure, somewhere else on the canvas
+    local best, bestDy, bestDx, ties = -1, 0, 0, 0
+    for dy = -minRow, h - 1 - maxRow do
+      for dx = -minCol, w - 1 - maxCol do
+        local n = scoreTable(entries, shade, w, h, dy, dx)
+        if n > best then
+          best, bestDy, bestDx, ties = n, dy, dx, 1
+        elseif n == best then
+          ties = ties + 1
+        end
+      end
+    end
+    if ties ~= 1 or best / total < TABLE_MIN then return nil end
+    return paintTable(entries, shade, w, h, bestDy, bestDx)
   end
 
   local function recoloured(rel, field, wantSkin)

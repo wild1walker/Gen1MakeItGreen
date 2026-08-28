@@ -430,6 +430,79 @@ do
     "the two copies of the back pic are no longer the same picture")
 end
 
+io.write("transforms.lua -- the back pic's table finds the sprite when it moves\n")
+do
+  -- A table is a list of coordinates, so it used to find the art it was drawn
+  -- against only where it sat.  The SAME sprite one pixel over -- an importer
+  -- that pads differently, a rip on a larger sheet, a canvas that is not
+  -- 32x32 -- failed all 33 guards at once and fell through to the flat ramp.
+  -- That was the whole of what a table could not reach, and it is placement,
+  -- not pixels.
+  --
+  -- The same fixture as above -- the table's own guard shades over a field of
+  -- the outfit's shade -- built at an offset inside a larger canvas.
+  local LIGHT = { { 10, 18 }, { 11, 16 }, { 12, 16 }, { 13, 17 },
+                  { 14, 14 }, { 14, 15 }, { 14, 16 }, { 14, 17 }, { 14, 18 } }
+  local PAPER = { { 20, 23 }, { 20, 24 }, { 20, 25 }, { 21, 23 }, { 21, 24 },
+                  { 21, 25 }, { 22, 24 }, { 22, 25 }, { 22, 26 }, { 23, 25 },
+                  { 23, 26 } }
+  local function backAt(size, dy, dx)
+    local rows = {}
+    for y = 1, size do
+      rows[y] = {}
+      for x = 1, size do rows[y][x] = O end
+    end
+    for _, at in ipairs(LIGHT) do rows[at[1] + dy + 1][at[2] + dx + 1] = S end
+    for _, at in ipairs(PAPER) do rows[at[1] + dy + 1][at[2] + dx + 1] = W end
+    return rows
+  end
+
+  local ctx = fakeCtx({ ["battle/redb.png"] = backAt(40, 4, 5) })
+  chunk(MOD .. "transforms.lua")(ctx)
+  local skin = ctx.written["greenskin/battle/redb.png"].out
+  eq(hex(skin[19][22]), "f0a363",
+    "the neck is found four rows and five columns from where it was drawn")
+  eq(hex(skin[27][31]), "f0a363", "...and the hand with it")
+  eq(hex(skin[20][17]), "ad7547", "...and the jaw's shadow")
+
+  -- and the picture it was drawn against is still read where it sits, by the
+  -- same coordinates as before: the offset is only ever a second attempt
+  local exact = fakeCtx({ ["battle/redb.png"] = backAt(32, 0, 0) })
+  chunk(MOD .. "transforms.lua")(exact)
+  eq(hex(exact.written["greenskin/battle/redb.png"].out[15][17]), "f0a363",
+    "art sitting where the table was authored is unaffected by any of this")
+end
+
+io.write("transforms.lua -- two readings of a back pic are no reading\n")
+do
+  -- The offset may not wander into painting something else, so a run has to
+  -- clear the same TABLE_MIN it always did AND be the only offset that does.
+  -- Here the guard pattern is laid down TWICE, so two offsets read the
+  -- picture equally well; an ambiguous picture is left alone rather than
+  -- painted at whichever of them came first.
+  local LIGHT = { { 10, 18 }, { 11, 16 }, { 12, 16 }, { 13, 17 },
+                  { 14, 14 }, { 14, 15 }, { 14, 16 }, { 14, 17 }, { 14, 18 } }
+  local PAPER = { { 20, 23 }, { 20, 24 }, { 20, 25 }, { 21, 23 }, { 21, 24 },
+                  { 21, 25 }, { 22, 24 }, { 22, 25 }, { 22, 26 }, { 23, 25 },
+                  { 23, 26 } }
+  local rows = {}
+  for y = 1, 64 do
+    rows[y] = {}
+    for x = 1, 64 do rows[y][x] = O end
+  end
+  for _, d in ipairs({ { 2, 3 }, { 30, 30 } }) do
+    for _, at in ipairs(LIGHT) do rows[at[1] + d[1] + 1][at[2] + d[2] + 1] = S end
+    for _, at in ipairs(PAPER) do rows[at[1] + d[1] + 1][at[2] + d[2] + 1] = W end
+  end
+
+  local ctx = fakeCtx({ ["battle/redb.png"] = rows })
+  chunk(MOD .. "transforms.lua")(ctx)
+  local skin = ctx.written["greenskin/battle/redb.png"].out
+  eq(hex(skin[17][21]), "a8dd8a",
+    "neither copy is painted: two equal readings are not a reading")
+  eq(hex(skin[45][48]), "a8dd8a", "...and that goes for the second as well")
+end
+
 io.write("transforms.lua -- the title figure is painted from a table\n")
 do
   -- The one picture the rules cannot express: fourteen of its skin pixels
