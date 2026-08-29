@@ -1400,5 +1400,112 @@ do
     "with no TitleState to wrap, the rest of the mod still lands")
 end
 
+-- ------- the walker in the dark
+--
+-- The green walker is trueColor so a lit map's palette cannot repaint it.
+-- The engine exempts a trueColor sprite from the palette pass entirely -- and
+-- the palette pass is also what blacks out an unlit cave, so the one sprite
+-- that opted out of being recoloured also opted out of being blacked out and
+-- the player glowed in Rock Tunnel next to a screenful of silhouettes.
+--
+-- The flag is dropped for the length of the draw in an unlit frame, and the
+-- engine's own bake -- through a dmgObj() that is ALREADY the darkened OBP0 --
+-- turns him into the same silhouette as everyone else.
+
+local function darkScreen(options)
+  local seen = {}
+  local dark = false
+  local SpriteRenderer = {}
+  function SpriteRenderer.draw(self, ...)
+    seen[#seen + 1] = { how = "draw", image = self.def.image,
+                        trueColor = self.def.trueColor, args = { ... } }
+    -- a draw that raises: the engine's own can, and what matters then is that
+    -- the record does not stay un-green
+    if self.def.boom then error("the draw blew up", 0) end
+    return "drew"
+  end
+  function SpriteRenderer.drawTile(self, ...)
+    seen[#seen + 1] = { how = "drawTile", image = self.def.image,
+                        trueColor = self.def.trueColor }
+  end
+  local PaletteFX = { shadeMap = function() return dark and {} or nil end }
+
+  package.loaded["src.render.SpriteRenderer"] = SpriteRenderer
+  package.loaded["src.render.PaletteFX"] = PaletteFX
+  local mod = fakeMod(options)
+  chunk(MOD .. "main.lua")(mod)
+  package.loaded["src.render.SpriteRenderer"] = nil
+  package.loaded["src.render.PaletteFX"] = nil
+
+  return {
+    mod = mod, SpriteRenderer = SpriteRenderer, seen = seen,
+    setDark = function(v) dark = v end,
+  }
+end
+
+io.write("main.lua -- the green walker is a silhouette in the dark\n")
+do
+  local screen = darkScreen({ player = "green", ribbon = true })
+  local GREEN = "assets/generated/green/sprites/red.png"
+  local OAK = "assets/generated/sprites/oak.png"
+
+  local green = { def = { image = GREEN, trueColor = true } }
+  local oak = { def = { image = OAK, trueColor = true } }
+
+  -- lit: nothing changes, and that is most of the game
+  screen.setDark(false)
+  screen.SpriteRenderer.draw(green, 1, 2)
+  eq(screen.seen[1].trueColor, true,
+    "on a lit map the walker keeps its exemption")
+  eq(green.def.trueColor, true, "and the record is untouched after")
+
+  -- unlit: the exemption is dropped for the length of the draw
+  screen.setDark(true)
+  screen.SpriteRenderer.draw(green, 1, 2)
+  eq(screen.seen[2].trueColor, nil,
+    "in an unlit frame it is drawn without one, so the OBP bake reaches it")
+  eq(green.def.trueColor, true, "and it is put straight back")
+
+  -- the fishing pose goes through the other draw, and takes the same rect
+  screen.SpriteRenderer.drawTile(green, "rod.png", 1, 2)
+  eq(screen.seen[3].trueColor, nil, "the fishing tiles are darkened too")
+  eq(green.def.trueColor, true, "and put back the same way")
+
+  -- somebody else's trueColor sprite is not this mod's to touch
+  screen.SpriteRenderer.draw(oak, 1, 2)
+  eq(screen.seen[4].trueColor, true,
+    "a sprite this mod did not repaint is left exactly as it was")
+
+  -- the return value survives the wrapper
+  eq(screen.SpriteRenderer.draw(green, 1, 2), "drew",
+    "the inner draw's answer is passed through")
+end
+
+io.write("main.lua -- a draw that raises still puts the flag back\n")
+do
+  local screen = darkScreen({ player = "green", ribbon = true })
+  local GREEN = "assets/generated/green/sprites/red.png"
+  local green = { def = { image = GREEN, trueColor = true, boom = true } }
+
+  screen.setDark(true)
+  local okCall, err = pcall(screen.SpriteRenderer.draw, green, 1, 2)
+  eq(okCall, false, "the error is not swallowed")
+  eq(err, "the draw blew up", "and arrives unwrapped, with no location bolted on")
+  eq(green.def.trueColor, true,
+    "and the sprite record is green again -- a walker left permanently "
+    .. "un-exempt would be a worse bug than the one being fixed")
+end
+
+io.write("main.lua -- PLAYER = RED wraps nothing\n")
+do
+  local screen = darkScreen({ player = "red", ribbon = true })
+  local red = { def = { image = "assets/generated/sprites/red.png",
+                        trueColor = true } }
+  screen.setDark(true)
+  screen.SpriteRenderer.draw(red, 1, 2)
+  eq(screen.seen[1].trueColor, true,
+    "with no green art there is nothing to darken and nothing is wrapped")
+end
+
 io.write(("\n%d passed, %d failed\n"):format(passed, failed))
 os.exit(failed == 0 and 0 or 1)
