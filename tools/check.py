@@ -40,7 +40,8 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from palette import EXTRA, PIC_RAMP, RAMP, TITLE_RAMP, hexof  # noqa: E402
+from palette import (EXTRA, PIC_RAMP, RAMP, SUITS, SUIT_ORDER,  # noqa: E402
+                     TITLE_RAMP, hexof)
 
 # (file, the table in it, what tools/palette.py says it must be)
 RAMPS = (
@@ -105,6 +106,50 @@ def check_extras():
                  % (name, got and hexof(got), hexof(want)))
 
 
+def check_suits():
+    """The nine suits, in all three files.
+
+    PLAYER offers nine colours and each is three numbers -- the outfit, the
+    portrait's light shade and the cap's bill.  The other four of a suit's
+    ramp (paper, skin, ink) are shared and are checked above, which is what
+    keeps "only the outfit changes" true rather than merely intended.
+
+    transforms.lua writes the files and main.lua colours MEWMON and the title
+    bake, so a suit that differs between the two is a title screen in one
+    colour and a player in another.  Neither can import tools/palette.py --
+    the recipe runs in a sandbox with no require at all -- so this is the
+    thing that holds them together.
+    """
+    listed = re.compile(
+        r'\{\s*"([a-z]+)"\s*,\s*' + r"\s*,\s*".join([ROW.pattern] * 3) + r"\s*\}")
+    keyed = re.compile(
+        r"([a-z]+)\s*=\s*\{\s*" + r"\s*,\s*".join([ROW.pattern] * 3) + r"\s*\}")
+
+    for name, pattern in (("transforms.lua", listed), ("main.lua", keyed)):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        at = text.find("local SUITS")
+        if at < 0:
+            fail(name, "no SUITS table to check")
+            continue
+        found = {}
+        for match in pattern.finditer(text[at:at + 4000]):
+            groups = match.groups()
+            found[groups[0]] = tuple(
+                tuple(int(c, 16) for c in groups[1 + i * 3:4 + i * 3])
+                for i in range(3))
+        if sorted(found) != sorted(SUITS):
+            fail(name, "SUITS names are %s; tools/palette.py says %s"
+                 % (" ".join(sorted(found)) or "(none)",
+                    " ".join(sorted(SUITS))))
+            continue
+        for suit in SUIT_ORDER:
+            if found[suit] != SUITS[suit]:
+                fail(name, "suit %s is %s; tools/palette.py says %s"
+                     % (suit,
+                        " ".join(hexof(c) for c in found[suit]),
+                        " ".join(hexof(c) for c in SUITS[suit])))
+
+
 ENTRY = re.compile(r'\{\s*"([^"]+)"\s*,\s*(true|false)\s*\}')
 
 
@@ -154,6 +199,7 @@ def check_generated():
 
 def main():
     check_palettes()
+    check_suits()
     check_extras()
     check_pics()
     check_generated()
@@ -161,7 +207,8 @@ def main():
         print("check: %s" % finding)
     if findings:
         return 1
-    print("check: palettes agree, the ribbon is current")
+    print("check: palettes and all %d suits agree, the ribbon is "
+          "current" % len(SUITS))
     return 0
 
 

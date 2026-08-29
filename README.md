@@ -46,17 +46,37 @@ In the mod manager, or in `OPTION > MODS`:
 
 ```
 WILD GREEN
-  PLAYER              GREEN     <- or RED
+  PLAYER              GREEN     <- or RED, ORANGE, BLUE, PURPLE,
+                                   YELLOW, PINK, BLACK, WHITE, GREY
   PORTRAIT SKIN       ON
   TITLE RIBBON        ON
   TITLE FIGURE        ON
   GREEN NAME LIST     ON
 ```
 
-- **`PLAYER`** is the switch back. `RED` gives you the vanilla character
-  everywhere — no recolor is applied at all, and the vanilla art was never
-  overwritten to begin with. It decides a `sprites` record, which is settled
-  at load, so it takes effect on the next launch.
+- **`PLAYER`** is the character's colour, and there are ten of them.
+
+  `GREEN` is the default and is what the cart is named after. `RED` is the
+  switch back: the vanilla character everywhere, no recolor applied at all,
+  and the vanilla art was never overwritten to begin with. The other eight —
+  `ORANGE`, `BLUE`, `PURPLE`, `YELLOW`, `PINK`, `BLACK`, `WHITE`, `GREY` —
+  are the same recipe over a different outfit.
+
+  Only the **outfit** changes between them. The skin, the lips, the paper and
+  the black outline are the same in all nine recoloured suits, which is the
+  whole reason the recipe learned to tell a face from a jacket in the first
+  place. It covers everything: the overworld walker and the `BICYCLE` sheet,
+  the battle back pic, the trainer card, Oak's intro, the credits, the Hall
+  of Fame, the town-map marker and the figure on the title screen.
+
+  Every suit is written to disk at install, so the row is a path change at
+  load and switching colour costs nothing at run time. It decides a `sprites`
+  record, which is settled at load, so it takes effect on the next launch.
+
+  `WHITE` is deliberately low-contrast — a white outfit on white paper is
+  carried by vanilla's own black outline, the way a white shirt is in any
+  four-shade art. The version ribbon on the title screen stays green in every
+  suit: that is the game's name, not the character's jacket.
 - **`PORTRAIT SKIN`** paints the face on the big pictures — the battle back
   pic, the trainer card, Oak's intro, the credits, the Hall of Fame — the
   character's own skin instead of the light green. Off is the flat green
@@ -112,11 +132,12 @@ and `tools/check.py` fails the build if they drift apart. That is not
 tidiness: a swap to a green file the recipe never wrote does not fall back to
 the red one — the image fails to load and the draw shows nothing at all.
 
-Its outputs go under a `green/` prefix rather than over the cache paths they
-were read from. Writing `sprites/red.png` would make the player green
-everywhere, always, and would take the `PLAYER` row away — there would be no
-red art left to switch back to. Under `green/` they shadow nothing, and both
-sets exist the whole time; `main.lua` points the records at one or the other.
+Its outputs go under a prefix named for the suit — `green/`, `blue/`,
+`grey/` — rather than over the cache paths they were read from. Writing
+`sprites/red.png` would make the player green everywhere, always, and would
+take the `PLAYER` row away; there would be no red art left to switch back to.
+Under a suit prefix they shadow nothing, every set exists the whole time, and
+`main.lua` points the records at whichever one the row names.
 
 ## The palette
 
@@ -139,6 +160,34 @@ and two colours that are not shades at all:
 |---|---|---|
 | mouth | `#ec4d29` | the lips — vanilla's own, sampled off red Red |
 | bill | `#e6f4dc` | the cap's bill — a green-tinted white |
+
+**The other eight suits.** Three values each, and only three: the outfit, the
+portrait's light shade and the bill. Skin, mouth, paper and ink do not move —
+the face is the face in every colour.
+
+Green's three are sampled by hand. The other eight are green's own rule over a
+different outfit: the portrait light is the outfit mixed 45% toward white, the
+bill 83% toward white — which reproduces green to within five values of 255 on
+every channel. Above 0.70 relative luminance (`YELLOW` and `WHITE`; green sits
+at 0.62) the bill goes 35% toward **black** instead, because a near-white bill
+on a near-white cap is no edge at all.
+
+| suit | outfit | portrait light | bill |
+|---|---|---|---|
+| `GREEN` | `#65ba3f` | `#a8dd8a` | `#e6f4dc` |
+| `ORANGE` | `#e2681c` | `#efac82` | `#fae5d8` |
+| `BLUE` | `#3f7bd8` | `#95b6ea` | `#dee9f8` |
+| `PURPLE` | `#8a5bd0` | `#bfa5e5` | `#ebe3f7` |
+| `YELLOW` | `#e8c53a` | `#f2df93` | `#978026` |
+| `PINK` | `#ee7bb8` | `#f6b6d8` | `#fce9f3` |
+| `BLACK` | `#3d3d45` | `#949499` | `#dededf` |
+| `WHITE` | `#cdd3da` | `#e4e9ee` | `#85898e` |
+| `GREY` | `#8b9199` | `#bfc2c7` | `#ebecee` |
+
+`tools/check.py` holds this table against the copies in `transforms.lua` and
+`main.lua`. Neither can import it — the recipe runs in a sandbox with no
+`require` at all — so a suit that differs between the two would be a title
+screen in one colour and a player in another.
 
 **The trainer art** — the battle back pic, and the front pic Oak's intro,
 the trainer card and the Hall of Fame share — takes a different four, because

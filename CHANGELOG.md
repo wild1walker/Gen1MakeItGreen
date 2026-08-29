@@ -2,6 +2,39 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.26.0] - 2026-08-29
+
+### Added
+
+- **`PLAYER` is ten colours.** `GREEN` and `RED` as before, plus `ORANGE`,
+  `BLUE`, `PURPLE`, `YELLOW`, `PINK`, `BLACK`, `WHITE` and `GREY`.
+
+  Only the **outfit** moves between them. The skin, the lips, the paper and
+  the black outline are the same in all nine recoloured suits — which is what
+  the recipe's face rules were built for, and is what makes a colour a change
+  of clothes rather than a change of person. Every picture follows: the
+  overworld walker and the `BICYCLE` sheet, the battle back pic, the trainer
+  card, Oak's intro, the credits, the Hall of Fame, the town-map marker and
+  the standing figure on the title screen.
+
+  Each suit is written to disk at install under a prefix of its own, so the
+  row is a path change at load — switching colour costs nothing at run time,
+  and `RED` is still the untouched cache with no recolor applied at all.
+
+  Green's three colours are the hand-sampled ones and have not moved: its
+  files come out byte for byte as they did before there was a table to look
+  them up in, and the test suite compares them pixel for pixel. The other
+  eight are green's own rule over a different outfit — the portrait light 45%
+  toward white, the bill 83% toward white, or 35% toward black for a pale
+  outfit where mixing further toward white would be no edge at all.
+
+  `WHITE` is deliberately low-contrast: a white outfit on white paper is
+  carried by vanilla's own black outline, the way a white shirt is in any
+  four-shade art. The title ribbon stays green in every suit — that is the
+  game's name, not the character's jacket.
+
+  `tools/check.py` holds the table across all three files that carry it.
+
 ## [1.25.0] - 2026-08-29
 
 ### Fixed

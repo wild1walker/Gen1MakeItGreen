@@ -5,11 +5,15 @@ own ledger stays "None currently"; these are this mod's divergences.
 
 ## Art
 
-- **The player wears green.** The overworld walker, the `BICYCLE` sheet where
-  the import wrote one, the battle back pic, the front pic that Oak's intro,
-  the trainer card and the Hall of Fame share, and the title screen's
-  standing figure are recolored from the player's own imported cache to the
-  Wild Green ramp. `PLAYER = RED` turns all of it off.
+- **The player wears green — or one of eight other colours.** The overworld
+  walker, the `BICYCLE` sheet where the import wrote one, the battle back
+  pic, the front pic that Oak's intro, the trainer card and the Hall of Fame
+  share, the town-map marker and the title screen's standing figure are
+  recolored from the player's own imported cache. `PLAYER` picks the colour:
+  `GREEN` (the default, and what the cart is named after), `ORANGE`, `BLUE`,
+  `PURPLE`, `YELLOW`, `PINK`, `BLACK`, `WHITE` or `GREY`. `PLAYER = RED`
+  turns all of it off. Only the outfit changes between the nine — the skin,
+  the lips, the paper and the outline are the same in every one.
 - **His skin is skin.** On the overworld sheets the face keeps a tan, the
   lips keep vanilla's red and the cap's bill is a green-tinted white. On the
   big pictures `PORTRAIT SKIN` finds the face, the ear, the temple and both
