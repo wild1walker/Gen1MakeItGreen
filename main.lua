@@ -248,6 +248,8 @@ return function(mod)
     -- so a name this mod guessed wrong is simply not matched.  A walker
     -- another mod has already reskinned points outside the cache, so
     -- greenOf declines it and this does not fight over it.
+    local greenArt = {}
+
     try("sprites", function()
       for id, def in mod.content.sprites:each() do
         local image = type(def) == "table" and def.image
@@ -255,10 +257,88 @@ return function(mod)
           local swapped = greenOf(image)
           if swapped then
             mod.content.sprites:patch(id, { image = swapped, trueColor = true })
+            greenArt[swapped] = true
           end
         end
       end
     end)
+
+    -- ------- and the walker in the dark
+    --
+    -- trueColor above is what keeps the green out of the palette pass.  The
+    -- palette pass is also what blacks a cave out: Rock Tunnel and the other
+    -- unlit floors arm PaletteFX's dark shift (home/fade.asm's FadePal2 writes
+    -- rOBP0 = `dc 3,3,3,2`, so every object colour lands on shade 3), and the
+    -- engine exempts a trueColor sprite from the whole thing --
+    -- SpriteRenderer:draw claims a markTrueColor rect for it and blits the art
+    -- as written.  So the one sprite that opted out of being recoloured also
+    -- opted out of being blacked out, and the green player walked through Rock
+    -- Tunnel lit up like a lamp beside a screenful of silhouettes.
+    --
+    -- The fix is not to paint him dark here.  It is to stop claiming an
+    -- exemption in the one frame where there is nothing to exempt: the flag is
+    -- dropped for the length of the draw, and the engine's own path bakes the
+    -- sheet through PaletteFX.dmgObj() -- which in an unlit frame is already
+    -- the darkened OBP0 -- and lets the zone shader colour it like every other
+    -- object on the map.  He is the same silhouette, in the same shade, as the
+    -- player who is not wearing green.
+    --
+    -- It works because of a decision transforms.lua already made: the green is
+    -- recoloured so its RED CHANNEL still buckets onto the engine's four
+    -- shades the way the vanilla art did (see "why shade 2 is the face").
+    -- The bake was never garbage; trueColor was there to stop a LIT map's
+    -- palette repainting the green, and an unlit one has no colour to keep.
+    local function darkFrame(PaletteFX)
+      if type(PaletteFX.shadeMap) == "function" then
+        local ok, map = pcall(PaletteFX.shadeMap)
+        -- Armed per frame by OverworldState:drawWorld while it draws a dark
+        -- map, and left nil for a battle drawn over one, which is lit.  So it
+        -- tracks the frame rather than the map.
+        if ok then return map ~= nil end
+      end
+      if type(PaletteFX.darkWorld) == "function" then
+        local ok, dark = pcall(PaletteFX.darkWorld)
+        if ok then return dark == true end
+      end
+      return false
+    end
+
+    if next(greenArt) then
+      try("dark caves", function()
+        local SpriteRenderer = require("src.render.SpriteRenderer")
+        local PaletteFX = require("src.render.PaletteFX")
+        if type(SpriteRenderer) ~= "table" or type(PaletteFX) ~= "table" then
+          return
+        end
+        if SpriteRenderer.__wildGreenDark then return end
+        SpriteRenderer.__wildGreenDark = true
+
+        -- Both draw paths, because the fishing pose goes through the other
+        -- one: drawTile blits the rod row wearing the sprite's own palette
+        -- and takes the same trueColor exemption.
+        for _, name in ipairs({ "draw", "drawTile" }) do
+          local inner = SpriteRenderer[name]
+          if type(inner) == "function" then
+            SpriteRenderer[name] = function(self, ...)
+              local def = self and self.def
+              if not (type(def) == "table" and def.trueColor
+                      and greenArt[def.image] and darkFrame(PaletteFX)) then
+                return inner(self, ...)
+              end
+              -- Put back on the way out however the draw goes, including
+              -- through an error: a sprite record left permanently un-green
+              -- would be a worse bug than the one being fixed.
+              def.trueColor = nil
+              local results = { pcall(inner, self, ...) }
+              def.trueColor = true
+              if not results[1] then error(results[2], 0) end
+              return table.unpack and table.unpack(results, 2)
+                or unpack(results, 2)
+            end
+          end
+        end
+      end)
+    end
   end
 
   -- ------- the name and the title screen

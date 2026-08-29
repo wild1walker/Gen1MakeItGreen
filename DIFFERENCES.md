@@ -90,6 +90,25 @@ own ledger stays "None currently"; these are this mod's divergences.
   reads grey art through. The mono and inverted display modes do not honour
   `trueColor` (`PaletteFX.honorsTrueColor`), so there the player falls back
   to the baked ramp like any other sprite.
+- **…except in the dark, where he gives the exemption up.** The palette pass
+  `trueColor` opts out of is also what blacks out an unlit cave — Rock Tunnel
+  and the other unlit floors arm PaletteFX's dark shift, and the engine
+  exempts a true-colour sprite from the whole thing. So the one sprite that
+  opted out of being *recoloured* had also opted out of being *blacked out*,
+  and the green player walked through Rock Tunnel lit up beside a screenful of
+  silhouettes.
+
+  In an unlit frame the flag is dropped for the length of the draw and the
+  engine's own path bakes the sheet through `PaletteFX.dmgObj()`, which is
+  already the darkened `OBP0` there. He is the same silhouette, in the same
+  shade, as a player who is not wearing green. It costs nothing because the
+  recipe already keeps the green bucketing onto the engine's four shades the
+  way the vanilla art did — the bake was never garbage, and an unlit map has
+  no colour to keep.
+
+  Only this mod's own art. A walker another mod reskinned is that mod's to
+  darken; [Crystal Animated Sprites][crystal] sets `trueColor` on its own
+  overworld sheets and glows in the same caves for the same reason.
 - **A new version takes effect on the next launch.** Mods are loaded once,
   at boot, so a version installed over a running game leaves the previous one
   running until you restart. On the launch after that everything is current:
@@ -123,3 +142,5 @@ wrote. Nothing else in the mod touches an engine module.
 None. The mod stores nothing in the save; its five rows live in the
 profile's mod options like any other. Uninstalling it leaves a save that loads exactly
 as it did.
+
+[crystal]: https://github.com/distilledorion-sketch/crystal_animated_sprites_with_shiny_visuals

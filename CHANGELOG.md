@@ -2,6 +2,38 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.24.0] - 2026-08-29
+
+### Fixed
+
+- **The green player no longer glows in a dark cave.** In Rock Tunnel — and
+  every other unlit floor — he walked around in full daylight colours beside a
+  screenful of silhouettes.
+
+  The recoloured art is marked `trueColor`, which is what keeps a lit map's
+  palette from reading our green through the shade buckets it reads grey art
+  through. But the palette pass that flag opts out of is *also* what blacks a
+  cave out: the engine exempts a true-colour sprite from the whole thing and
+  blits the art as written. So the one sprite that opted out of being
+  recoloured had also opted out of being blacked out.
+
+  The fix is not to paint him dark by hand. It is to stop claiming an
+  exemption in the one frame where there is nothing to exempt: the flag is
+  dropped for the length of the draw, and the engine's own path bakes the
+  sheet through `PaletteFX.dmgObj()` — which in an unlit frame is already the
+  darkened `OBP0` — and lets the zone shader colour him like every other
+  object on the map. Same silhouette, same shade, as a player not wearing
+  green.
+
+  It costs nothing because `transforms.lua` already recolours the green so its
+  red channel buckets onto the engine's four shades the way the vanilla art
+  did (see "why shade 2 is the face"). The bake was never garbage; `trueColor`
+  was there to protect a *lit* map's colours, and an unlit one has none.
+
+  The fishing pose goes through the other draw path and gets the same
+  treatment. Only this mod's own art is touched — a walker another mod
+  reskinned is that mod's to darken.
+
 ## [1.23.0] - 2026-08-28
 
 ### Fixed
