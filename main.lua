@@ -303,6 +303,85 @@ return function(mod)
       return false
     end
 
+    -- ------- and the walker on the town map
+    --
+    -- TownMap builds its own marker rather than drawing the player: it reads
+    -- game.data.sprites[field.playerSprites.walk] and bakes THAT record's
+    -- image through SpriteRenderer.obpImage (src/ui/TownMap.lua markerSheet).
+    -- Two things follow, and both were wrong on this cart.
+    --
+    -- It never asks the `player.sprite` hook, which is what makes the walker
+    -- green everywhere else, so the marker was the red art on a map where the
+    -- player is green in every other frame of the game.
+    --
+    -- And obpImage keys OBJ colour 0 to alpha -- `r > 0.83` becomes
+    -- transparent, matching GBC hardware, where sprite palette index 0 always
+    -- is.  Wild Green's skin is 0xf0a363: red channel 0xf0, which is over that
+    -- line.  So the face and the hands came out as holes with the map showing
+    -- through them, on top of being the wrong colour.
+    --
+    -- Neither is a bake this art wants.  It is authored full colour and is
+    -- drawn as written everywhere else -- that is what trueColor means up
+    -- above -- so the marker is simply the file, loaded and handed to the same
+    -- two fields the engine drew from.  markPlayerRedraw replays through those
+    -- same fields, so the replay over the zone pass follows without another
+    -- edit.
+    try("town map", function()
+      local TownMap = require("src.ui.TownMap")
+      if type(TownMap) ~= "table" or type(TownMap.new) ~= "function" then
+        return
+      end
+      if TownMap.__wildGreenMarker then return end
+      local okAssets, Assets = pcall(require, "src.render.Assets")
+      if not (okAssets and type(Assets) == "table"
+              and type(Assets.image) == "function") then
+        return
+      end
+      TownMap.__wildGreenMarker = true
+
+      -- The record TownMap itself reads, resolved the same way it resolves
+      -- it, so a dataset that names another walker is followed rather than
+      -- guessed at.  Already-green is passed through: the sprites registry
+      -- patch above may have reached this record, and greenOf declines a path
+      -- that is already under the green prefix.
+      local function markerPath(game)
+        local data = game and game.data
+        local sprites = (type(data) == "table" and data.sprites) or {}
+        local field = (type(data) == "table" and data.field) or {}
+        local id = (field.playerSprites or {}).walk or "SPRITE_RED"
+        local def = sprites[id] or sprites.SPRITE_RED
+        local image = type(def) == "table" and def.image or nil
+        if type(image) ~= "string" then return nil end
+        if image:sub(1, #GREEN) == GREEN or image:sub(1, #SKINNED) == SKINNED then
+          return image
+        end
+        return greenOf(image)
+      end
+
+      local inner = TownMap.new
+      TownMap.new = function(game, ...)
+        local screen = inner(game, ...)
+        if type(screen) ~= "table" then return screen end
+        -- Only when the engine drew a marker of its own.  With no sheet it
+        -- draws a small square instead, and putting a walker where it chose
+        -- not to put one is a change this has no business making.
+        if not screen.playerSheet then return screen end
+        local path = markerPath(game)
+        if not path then return screen end
+        local ok, image = pcall(Assets.image, path)
+        if not (ok and image) then return screen end
+        pcall(image.setFilter, image, "nearest", "nearest")
+        -- Inside the closure, not as pcall's first argument: a host without
+        -- love.graphics would raise on the index before pcall ever ran.
+        local okQuad, quad = pcall(function()
+          return love.graphics.newQuad(0, 0, 16, 16, image:getDimensions())
+        end)
+        if not (okQuad and quad) then return screen end
+        screen.playerSheet, screen.playerQuad = image, quad
+        return screen
+      end
+    end)
+
     if next(greenArt) then
       try("dark caves", function()
         local SpriteRenderer = require("src.render.SpriteRenderer")

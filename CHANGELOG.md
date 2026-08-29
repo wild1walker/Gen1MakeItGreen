@@ -2,6 +2,35 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.25.0] - 2026-08-29
+
+### Fixed
+
+- **The town map marker is the green player, and his face is not a hole.**
+  On the AREA and FLY maps the little figure marking where you are standing
+  was still wearing red, on a cart where the player is green in every other
+  frame of the game — and his skin and hands were see-through, with the map
+  showing through them.
+
+  `TownMap` does not draw the player. It builds a marker of its own: it reads
+  `game.data.sprites[field.playerSprites.walk]` and bakes *that* record's
+  image through `SpriteRenderer.obpImage`. Two things follow. It never asks
+  the `player.sprite` hook, which is what makes the walker green everywhere
+  else, so it got the red art. And `obpImage` keys OBJ colour 0 to alpha —
+  `r > 0.83` becomes transparent, which is what real GBC hardware does with
+  sprite palette index 0 — and Wild Green's skin is `0xf0a363`, whose red
+  channel is `0xf0`. Over the line. So the face and the hands were keyed away.
+
+  Neither is a bake this art wants. It is authored full colour and drawn as
+  written everywhere else, so the marker is now simply the file: loaded and
+  handed to the same two fields the engine drew from, no bake, nothing to key
+  to alpha. `markPlayerRedraw` replays through those same fields, so the
+  replay over the map's palette pass follows without a second edit.
+
+  A map the engine drew no marker on keeps none — it draws a small square
+  there instead, and putting a walker where it chose not to put one is not
+  this mod's call. `PLAYER = RED` leaves the whole thing alone.
+
 ## [1.24.0] - 2026-08-29
 
 ### Fixed
