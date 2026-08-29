@@ -20,6 +20,7 @@ It works on its own too. Nothing here depends on either bundle.
 | the battle back pic | the one drawn at 2x until "Go!" | the `player.sprite` hook |
 | the front pic | Oak's intro, the trainer card, the Hall of Fame | the `player.sprite` hook |
 | the credits and intro pics | where the import wrote them | the `player.sprite` hook |
+| the town map marker | the figure marking where you stand, on AREA and FLY | a wrap on `TownMap.new` |
 | the title screen | the version ribbon | `field.boot.title` |
 | the title figure | the standing player on that screen | the `MEWMON` palette, and a bake of its own under `ADVANCED` |
 | the default name | `GREEN` where the game offered `RED` | `field.boot.playerName` |
@@ -445,6 +446,37 @@ The rule runs on the overworld sheets only, where the frames really are a
 16px stack and the cap is a handful of pixels. On the 56×56 trainer card
 there are dozens of small shade-2 regions touching shade 3 that are shading
 rather than a bill.
+
+### The town map draws its own marker, and bakes it
+
+`TownMap` never draws the player. It builds a marker of its own: it reads
+`game.data.sprites[field.playerSprites.walk]` and bakes *that* record's image
+through `SpriteRenderer.obpImage` (`src/ui/TownMap.lua` `markerSheet`). Two
+things follow from that, and both were wrong on this cart.
+
+It never asks the `player.sprite` hook — the thing that makes the walker green
+everywhere else — so the marker was the red art on a map where the player is
+green in every other frame.
+
+And `obpImage` keys OBJ colour 0 to alpha: `r > 0.83` becomes transparent,
+matching real GBC hardware, where sprite palette index 0 unconditionally is.
+Wild Green's skin is `0xf0a363` — red channel `0xf0`, over that line — so the
+face and the hands came out as holes with the map showing through them.
+
+Neither is a bake this art wants. It is authored full colour and drawn as
+written everywhere else — that is what `trueColor` buys — so the marker is
+simply the file: `Assets.image` on the green twin of the record's path, a
+16x16 quad cut for it, and both handed to the same two fields the engine drew
+from. `markPlayerRedraw` replays through those same fields, so the replay over
+the map's palette pass follows without a second edit.
+
+A record that is *already* green is passed through rather than declined: the
+`sprites` registry patch reaches that record on some datasets, and `greenOf`
+returns nil for a path already under the green prefix — so declining would
+have fallen back to the engine's bake on exactly the carts where the patch
+worked. And a map the engine drew no marker on keeps none: it draws a small
+square there instead, and putting a walker where it chose not to is a change
+this has no business making.
 
 ### The hook has to sit at priority 940
 

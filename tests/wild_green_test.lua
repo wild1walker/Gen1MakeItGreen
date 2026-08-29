@@ -1507,5 +1507,105 @@ do
     "with no green art there is nothing to darken and nothing is wrapped")
 end
 
+-- ------- the walker on the town map
+--
+-- TownMap builds its own marker: it reads game.data.sprites[...walk] and
+-- bakes THAT record's image through SpriteRenderer.obpImage.  It never asks
+-- the player.sprite hook, so the marker was the red art on a cart where the
+-- player is green in every other frame -- and obpImage keys OBJ colour 0 to
+-- alpha (`r > 0.83`), which Wild Green's 0xf0a363 skin is over, so the face
+-- and hands came out as holes with the map showing through.
+--
+-- The marker is the file, loaded and handed to the two fields the engine drew
+-- from.  No bake, so nothing to key to alpha.
+
+local function townMapScreen(options, spriteImage, buildsMarker)
+  local loaded = {}
+  local TownMap = {}
+  TownMap.new = function(game, opts)
+    return { __vanilla = true, game = game, opts = opts,
+             playerSheet = buildsMarker and { vanilla = true } or nil,
+             playerQuad = buildsMarker and { vanilla = true } or nil }
+  end
+  local Assets = {
+    image = function(path)
+      loaded[#loaded + 1] = path
+      return { path = path, setFilter = function() end,
+               getDimensions = function() return 16, 96 end }
+    end,
+  }
+  package.loaded["src.ui.TownMap"] = TownMap
+  package.loaded["src.render.Assets"] = Assets
+  local mod = fakeMod(options)
+  chunk(MOD .. "main.lua")(mod)
+  package.loaded["src.ui.TownMap"] = nil
+  package.loaded["src.render.Assets"] = nil
+
+  local game = {
+    data = {
+      sprites = { SPRITE_RED = { image = spriteImage } },
+      field = { playerSprites = { walk = "SPRITE_RED" } },
+    },
+  }
+  return { TownMap = TownMap, loaded = loaded, game = game }
+end
+
+-- The quad is cut through love.graphics when TownMap.new is CALLED, so the
+-- harness stands one up for the whole section rather than per screen --
+-- without it the mod's guard would decline every time and both blocks below
+-- would pass on a path that never ran.
+local hadLove = _G.love
+_G.love = _G.love or {}
+_G.love.graphics = _G.love.graphics or {}
+local hadQuad = _G.love.graphics.newQuad
+_G.love.graphics.newQuad = function(x, y, w, h, sw, sh)
+  return { x = x, y = y, w = w, h = h, sw = sw, sh = sh }
+end
+
+io.write("main.lua -- the town map marker is the green art, unbaked\n")
+do
+  local RED = "assets/generated/sprites/red.png"
+  local GREEN = "assets/generated/green/sprites/red.png"
+
+  local t = townMapScreen({ player = "green", ribbon = true }, RED, true)
+  ok(t.TownMap.new ~= nil, "TownMap.new is still there")
+  local screen = t.TownMap.new(t.game, {})
+  eq(t.loaded[1], GREEN,
+    "the marker is loaded from the green twin of the record's art")
+  eq(screen.playerSheet and screen.playerSheet.path, GREEN,
+    "and it is the sheet the engine draws from")
+  ok(screen.playerQuad ~= nil and screen.playerQuad.vanilla == nil,
+    "with a quad cut for it, so markPlayerRedraw replays the same art")
+
+  -- The record may already be green: the sprites registry patch above reaches
+  -- some datasets, and greenOf declines a path that is already under the
+  -- prefix.  Passed through rather than declined, or the marker would fall
+  -- back to the engine's bake on exactly the carts where the patch worked.
+  local already = townMapScreen({ player = "green", ribbon = true }, GREEN, true)
+  already.TownMap.new(already.game, {})
+  eq(already.loaded[1], GREEN, "a record that is already green is used as it is")
+
+  -- With no sheet of its own the engine draws a small square instead.  Putting
+  -- a walker where it chose not to put one is not this mod's call.
+  local none = townMapScreen({ player = "green", ribbon = true }, RED, false)
+  local bare = none.TownMap.new(none.game, {})
+  eq(bare.playerSheet, nil, "a map the engine drew no marker on keeps none")
+  eq(#none.loaded, 0, "and nothing is loaded for it")
+
+end
+
+io.write("main.lua -- PLAYER = RED leaves the town map alone\n")
+do
+  local RED = "assets/generated/sprites/red.png"
+  local t = townMapScreen({ player = "red", ribbon = true }, RED, true)
+  local screen = t.TownMap.new(t.game, {})
+  eq(#t.loaded, 0, "nothing is loaded")
+  ok(screen.playerSheet and screen.playerSheet.vanilla,
+    "and the marker is the engine's own, which is the switch the cart promises")
+end
+
+_G.love.graphics.newQuad = hadQuad
+if not hadLove then _G.love = nil end
+
 io.write(("\n%d passed, %d failed\n"):format(passed, failed))
 os.exit(failed == 0 and 0 or 1)
