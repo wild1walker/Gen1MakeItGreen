@@ -10,6 +10,9 @@ return {
   tags = { "art", "player", "sprites", "title", "green", "cart" },
   differences = {
     added = {
+      "nine colours for the player, green by default: only the outfit "
+        .. "changes between them, and the skin, the lips and the outline "
+        .. "are the same in every one",
       "the player in green: the overworld walker, the BICYCLE sheet where "
         .. "the import wrote one, the battle back pic, the front pic Oak's "
         .. "intro and the trainer card and the Hall of Fame share. Only the "
@@ -20,7 +23,8 @@ return {
         .. "where the vanilla art is two fragments the title code "
         .. "repositions. The lettering is drawn here, on the importer's "
         .. "four grey shades, and is not derived from anything",
-      "a PLAYER row -- GREEN or RED -- plus TITLE RIBBON and DEFAULT NAME "
+      "a PLAYER row -- GREEN, RED, ORANGE, BLUE, PURPLE, YELLOW, PINK, "
+        .. "BLACK, WHITE or GREY -- plus TITLE RIBBON and DEFAULT NAME "
         .. "GREEN, all three in the mod manager",
     },
     changed = {

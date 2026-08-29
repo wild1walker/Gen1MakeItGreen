@@ -44,11 +44,6 @@
 
 return function(mod)
   local CACHE = "assets/generated/"
-  local GREEN = CACHE .. "green/"
-  -- the same portraits with the face painted skin.  A second set of files
-  -- rather than a second recipe: the recipe runs at install and never sees
-  -- the options, so both are written and this picks between them.
-  local SKINNED = CACHE .. "greenskin/"
 
   -- The character's four, lightest first: paper, skin, outfit, ink.  A copy
   -- of the ramp in transforms.lua, which cannot be imported from --
@@ -84,13 +79,41 @@ return function(mod)
     { 0x00, 0x00, 0x00 },
   }
 
+  -- The other eight suits, as (outfit, portrait light, bill).  A copy of the
+  -- table in transforms.lua, which cannot be imported from -- tools/check.py
+  -- fails the build if the two drift apart.  Only three values change
+  -- between suits: the skin, the paper and the ink are the same in all nine,
+  -- which is what "only the outfit" means.
+  --
+  -- It is here for the two things this file colours itself rather than
+  -- reading off disk -- MEWMON, the palette the title screen paints the
+  -- player figure through, and the bake that stands in when the cache has no
+  -- title/player.png.  Both have to wear the suit the pictures do or the
+  -- title screen is a different colour from the game behind it.
+  local SUITS = {
+    green  = { { 0x65, 0xba, 0x3f }, { 0xa8, 0xdd, 0x8a }, { 0xe6, 0xf4, 0xdc } },
+    orange = { { 0xe2, 0x68, 0x1c }, { 0xef, 0xac, 0x82 }, { 0xfa, 0xe5, 0xd8 } },
+    blue   = { { 0x3f, 0x7b, 0xd8 }, { 0x95, 0xb6, 0xea }, { 0xde, 0xe9, 0xf8 } },
+    purple = { { 0x8a, 0x5b, 0xd0 }, { 0xbf, 0xa5, 0xe5 }, { 0xeb, 0xe3, 0xf7 } },
+    yellow = { { 0xe8, 0xc5, 0x3a }, { 0xf2, 0xdf, 0x93 }, { 0x97, 0x80, 0x26 } },
+    pink   = { { 0xee, 0x7b, 0xb8 }, { 0xf6, 0xb6, 0xd8 }, { 0xfc, 0xe9, 0xf3 } },
+    black  = { { 0x3d, 0x3d, 0x45 }, { 0x94, 0x94, 0x99 }, { 0xde, 0xde, 0xdf } },
+    white  = { { 0xcd, 0xd3, 0xda }, { 0xe4, 0xe9, 0xee }, { 0x85, 0x89, 0x8e } },
+    grey   = { { 0x8b, 0x91, 0x99 }, { 0xbf, 0xc2, 0xc7 }, { 0xeb, 0xec, 0xee } },
+  }
+
   mod.options:define({
     -- The character, and the only thing here a player is likely to want both
     -- ways: GREEN is what the cart is for, RED is the vanilla art untouched.
     -- The overworld walker is a record, so this lands on the next launch;
     -- the battle and card pics follow the hook and change immediately.
     { key = "player", type = "choice", label = "PLAYER",
-      choices = { { "GREEN", "green" }, { "RED", "red" } },
+      choices = {
+        { "GREEN", "green" }, { "RED", "red" },
+        { "ORANGE", "orange" }, { "BLUE", "blue" }, { "PURPLE", "purple" },
+        { "YELLOW", "yellow" }, { "PINK", "pink" }, { "BLACK", "black" },
+        { "WHITE", "white" }, { "GREY", "grey" },
+      },
       default = "green" },
     -- The title screen's version ribbon and the band it sits in.
     -- The face on the big pictures -- the battle back pic, the trainer card,
@@ -121,7 +144,32 @@ return function(mod)
     return value
   end
 
-  local green = option("player", "green") == "green"
+  -- Which suit, and the two prefixes its files live under.  RED is not a
+  -- suit: it is the vanilla cache with nothing done to it, so it has no
+  -- prefix and every swap below declines.  A stored value this build does
+  -- not know -- a save from a version with a colour that has since gone --
+  -- falls back to the default rather than pointing at files nobody wrote.
+  local suit = option("player", "green")
+  if suit ~= "red" and not SUITS[suit] then suit = "green" end
+  local green = suit ~= "red"
+  -- the same portraits with the face painted skin.  A second set of files
+  -- rather than a second recipe: the recipe runs at install and never sees
+  -- the options, so both are written and this picks between them.
+  local PREFIX = CACHE .. suit .. "/"
+  local SKINNED = CACHE .. suit .. "skin/"
+
+  -- The chosen suit's own two ramps: the four that never change, with the
+  -- outfit and the portrait's light swapped in -- so a suit can never move
+  -- the skin.  GREEN takes the two named tables above as they are rather
+  -- than rebuilding them, which is what makes the default provably the same
+  -- object it has always been.  RED reaches neither of the places these are
+  -- used.
+  local WORN_RAMP, WORN_PIC = WILD_GREEN, WILD_GREEN_PIC
+  local WORN = SUITS[suit]
+  if WORN and suit ~= "green" then
+    WORN_RAMP = { WILD_GREEN[1], WILD_GREEN[2], WORN[1], WILD_GREEN[4] }
+    WORN_PIC = { WILD_GREEN[1], WORN[2], WORN[1], WILD_GREEN[4] }
+  end
 
   -- Exactly the pictures transforms.lua recolours, and the only ones this
   -- will swap.  It is the same list, in the same order, and tools/check.py
@@ -166,7 +214,7 @@ return function(mod)
     local rel = path:match("^" .. CACHE .. "(.+)$")
     if not rel or not KNOWN[rel] then return nil end
     if skinned and PORTRAIT[rel] then return SKINNED .. rel end
-    return GREEN .. rel
+    return PREFIX .. rel
   end
 
   -- Registry writes are pcall'd one at a time rather than in a block: a
@@ -352,7 +400,7 @@ return function(mod)
         local def = sprites[id] or sprites.SPRITE_RED
         local image = type(def) == "table" and def.image or nil
         if type(image) ~= "string" then return nil end
-        if image:sub(1, #GREEN) == GREEN or image:sub(1, #SKINNED) == SKINNED then
+        if image:sub(1, #PREFIX) == PREFIX or image:sub(1, #SKINNED) == SKINNED then
           return image
         end
         return greenOf(image)
@@ -627,7 +675,7 @@ return function(mod)
     local okMap = pcall(function()
       copy:mapPixel(function(_, _, r, g, b, a)
         if a == 0 then return r, g, b, a end
-        local colour = WILD_GREEN_PIC[shadeOf(r)]
+        local colour = WORN_PIC[shadeOf(r)]
         return colour[1] / 255, colour[2] / 255, colour[3] / 255, a
       end)
     end)
@@ -821,7 +869,7 @@ return function(mod)
 
   if green and option("title_figure", true) then
     try("palettes.MEWMON", function()
-      mod.content.palettes:override("MEWMON", WILD_GREEN)
+      mod.content.palettes:override("MEWMON", WORN_RAMP)
     end)
     try("title.figure", function()
       mod.log:info("title figure under REDPP: %s", tostring(wrapTitleFigure()))
@@ -852,6 +900,7 @@ return function(mod)
   -- skinned copies, green/ the flat ones -- and a build that does not name a
   -- prefix at all is a build older than the row.
   mod.log:info("player=%s portrait_skin=%s ribbon=%s -- pics are read from %s",
-    green and "GREEN" or "RED", tostring(skinned),
-    tostring(option("ribbon", true)), skinned and SKINNED or GREEN)
+    suit:upper(), tostring(skinned),
+    tostring(option("ribbon", true)),
+    green and (skinned and SKINNED or PREFIX) or "the cache, untouched")
 end

@@ -89,6 +89,50 @@ return function(ctx)
     { 0x00, 0x00, 0x00 },
   }
 
+  -- ------- and the other eight
+  --
+  -- PLAYER is nine colours.  Only three values differ between them, and they
+  -- are the three above that carry the outfit's hue: the outfit, the
+  -- portrait's light shade, and the bill.  SKIN, SKIN_DARK, MOUTH, the paper
+  -- and the ink are the SAME in every suit -- the face is the face whatever
+  -- he is wearing, which is what "only the outfit" means and is the whole
+  -- reason the rules below learned to tell skin from clothing.
+  --
+  -- Green's three are the hand-sampled ones above and do not move: it is the
+  -- default and the cart's own colour, and its files come out byte for byte
+  -- as they did before this table existed.  The other eight are its own rule
+  -- applied to a different outfit -- 45% toward white for the portrait light,
+  -- 83% toward white for the bill, and 35% toward BLACK for the bill of a
+  -- pale outfit, where mixing further toward white would be no edge at all.
+  -- Derived once and written out, so what ships is numbers rather than
+  -- arithmetic; tools/check.py holds these against tools/palette.py.
+  --
+  -- The order is the order the PLAYER row offers them, green first.
+  local SUITS = {
+    { "green",  { 0x65, 0xba, 0x3f }, { 0xa8, 0xdd, 0x8a }, { 0xe6, 0xf4, 0xdc } },
+    { "orange", { 0xe2, 0x68, 0x1c }, { 0xef, 0xac, 0x82 }, { 0xfa, 0xe5, 0xd8 } },
+    { "blue",   { 0x3f, 0x7b, 0xd8 }, { 0x95, 0xb6, 0xea }, { 0xde, 0xe9, 0xf8 } },
+    { "purple", { 0x8a, 0x5b, 0xd0 }, { 0xbf, 0xa5, 0xe5 }, { 0xeb, 0xe3, 0xf7 } },
+    { "yellow", { 0xe8, 0xc5, 0x3a }, { 0xf2, 0xdf, 0x93 }, { 0x97, 0x80, 0x26 } },
+    { "pink",   { 0xee, 0x7b, 0xb8 }, { 0xf6, 0xb6, 0xd8 }, { 0xfc, 0xe9, 0xf3 } },
+    { "black",  { 0x3d, 0x3d, 0x45 }, { 0x94, 0x94, 0x99 }, { 0xde, 0xde, 0xdf } },
+    { "white",  { 0xcd, 0xd3, 0xda }, { 0xe4, 0xe9, 0xee }, { 0x85, 0x89, 0x8e } },
+    { "grey",   { 0x8b, 0x91, 0x99 }, { 0xbf, 0xc2, 0xc7 }, { 0xeb, 0xec, 0xee } },
+  }
+
+  -- One suit as the two ramps and the bill the recipe below actually reads.
+  -- Built from the four constants that never change plus the three that do,
+  -- so a suit cannot accidentally move the skin.
+  local function suitOf(entry)
+    local outfit, picLight, bill = entry[2], entry[3], entry[4]
+    return {
+      id = entry[1],
+      ramp = { WILD_GREEN[1], WILD_GREEN[2], outfit, WILD_GREEN[4] },
+      picRamp = { WILD_GREEN[1], picLight, outfit, WILD_GREEN[4] },
+      bill = bill,
+    }
+  end
+
   -- Every picture of the player this recipe knows how to recolour, and the
   -- ONLY ones main.lua will swap: the hook checks this same list, so it can
   -- never point a draw at a green file the recipe did not write.  The two
@@ -684,8 +728,9 @@ return function(ctx)
     return paintTable(entries, shade, w, h, bestDy, bestDx)
   end
 
-  local function recoloured(rel, field, wantSkin)
-    local ramp = field and WILD_GREEN or WILD_GREEN_PIC
+  local function recoloured(rel, field, wantSkin, suit)
+    local ramp = field and suit.ramp or suit.picRamp
+    local BILL = suit.bill
     local bill = field
     local src = ctx.readImage(rel)
     local out = ctx.readImage(rel)
@@ -855,6 +900,7 @@ return function(ctx)
         -- is the shadow.  Which pieces are shadow is the detail pass's
         -- answer, not the shade's.
         if skin and skin[y] and skin[y][x] then
+          -- the skin, which is the same in every suit
           colour = WILD_GREEN[2]
         elseif detail and detail[y] and detail[y][x] then
           colour = SKIN_DARK
@@ -874,33 +920,47 @@ return function(ctx)
     return out
   end
 
-  for _, entry in ipairs(PICS) do
-    local rel, field = entry[1], entry[2]
-    -- A cache that does not carry one of these is a cache from a version or
-    -- an import that never made it, not a broken install: skip it and leave
-    -- that picture as the base game drew it.
-    if ctx.exists(rel) then
-      local ok, image = pcall(recoloured, rel, field)
-      if not ok then
-        -- the per-pixel path is one step past the documented ctx, so its
-        -- absence costs the position rules and nothing else
-        image = ctx.recolor(ctx.readImage(rel),
-          field and WILD_GREEN or WILD_GREEN_PIC)
-      end
-      ctx.writeImage(image, "green/" .. rel)
+  -- Every suit gets the whole set.  Nine colours by nine pictures, plus a
+  -- skinned twin for each of the portraits -- so the option is a path
+  -- change at load rather than a re-run of this file, and switching colour
+  -- costs nothing at all.  All of it is small art: 16x96 walker sheets and
+  -- 56x56 portraits, and this runs once on install.
+  --
+  -- The prefix is the suit's own id, which matches nothing the importer
+  -- writes and therefore shadows nothing -- the same reason "green/" was
+  -- chosen, now nine times over.  RED needs no prefix and gets none: it is
+  -- the vanilla cache, untouched.
+  for _, entry in ipairs(SUITS) do
+    local suit = suitOf(entry)
+    for _, pic in ipairs(PICS) do
+      local rel, field = pic[1], pic[2]
+      -- A cache that does not carry one of these is a cache from a version or
+      -- an import that never made it, not a broken install: skip it and leave
+      -- that picture as the base game drew it.
+      if ctx.exists(rel) then
+        local ok, image = pcall(recoloured, rel, field, false, suit)
+        if not ok then
+          -- the per-pixel path is one step past the documented ctx, so its
+          -- absence costs the position rules and nothing else
+          image = ctx.recolor(ctx.readImage(rel),
+            field and suit.ramp or suit.picRamp)
+        end
+        ctx.writeImage(image, suit.id .. "/" .. rel)
 
-      -- A second copy of every portrait with the face painted skin, which is
-      -- what the PORTRAIT SKIN row picks between.  Two files rather than one
-      -- decided here, because the recipe runs at install and never sees the
-      -- options -- and because it makes the rule something a player can turn
-      -- off in a menu rather than something that needs a release to undo.
-      --
-      -- When the rule finds no face the two copies are identical, so the row
-      -- is a no-op on that picture rather than broken.  The battle BACK pic
-      -- is exactly that case: there is no face on it to find.
-      if not field then
-        local okSkin, skinned = pcall(recoloured, rel, field, true)
-        ctx.writeImage(okSkin and skinned or image, "greenskin/" .. rel)
+        -- A second copy of every portrait with the face painted skin, which
+        -- is what the PORTRAIT SKIN row picks between.  Two files rather than
+        -- one decided here, because the recipe runs at install and never sees
+        -- the options -- and because it makes the rule something a player can
+        -- turn off in a menu rather than something that needs a release to
+        -- undo.
+        --
+        -- When the rule finds no face the two copies are identical, so the
+        -- row is a no-op on that picture rather than broken.  The battle BACK
+        -- pic is exactly that case: there is no face on it to find.
+        if not field then
+          local okSkin, skinned = pcall(recoloured, rel, field, true, suit)
+          ctx.writeImage(okSkin and skinned or image, suit.id .. "skin/" .. rel)
+        end
       end
     end
   end

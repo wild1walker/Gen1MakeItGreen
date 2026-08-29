@@ -570,6 +570,61 @@ do
     "the battle back pic takes the light green")
 end
 
+io.write("transforms.lua -- nine suits, and only the outfit moves\n")
+do
+  -- What the PLAYER row promises is that the colour changes and the PERSON
+  -- does not.  So the check is per-suit and most of it is about what stayed
+  -- the same: the face, the lips, the paper and the ink are one colour in all
+  -- nine, and the outfit is the only thing that moved.
+  local SUIT_NAMES = { "green", "orange", "blue", "purple", "yellow",
+                       "pink", "black", "white", "grey" }
+  local OUTFIT = {
+    green  = "65ba3f", orange = "e2681c", blue   = "3f7bd8",
+    purple = "8a5bd0", yellow = "e8c53a", pink   = "ee7bb8",
+    black  = "3d3d45", white  = "cdd3da", grey   = "8b9199",
+  }
+  local PIC_LIGHT = {
+    green  = "a8dd8a", orange = "efac82", blue   = "95b6ea",
+    purple = "bfa5e5", yellow = "f2df93", pink   = "f6b6d8",
+    black  = "949499", white  = "e4e9ee", grey   = "bfc2c7",
+  }
+
+  local ctx = fakeCtx({ ["sprites/red.png"] = FACE,
+                        ["battle/redb.png"] = FACE })
+  chunk(MOD .. "transforms.lua")(ctx)
+
+  local seen = {}
+  for _, suit in ipairs(SUIT_NAMES) do
+    local sheet = ctx.written[suit .. "/sprites/red.png"]
+    ok(sheet ~= nil, suit .. " gets an overworld sheet")
+    if sheet then
+      eq(hex(sheet.out[1][3]), OUTFIT[suit], suit .. " wears its own outfit")
+      eq(hex(sheet.out[7][3]), "f0a363", suit .. " keeps the same skin")
+      eq(hex(sheet.out[9][4]), "ec4d29", suit .. " keeps vanilla's lips")
+      eq(hex(sheet.out[1][1]), "000000", suit .. " keeps black ink")
+      seen[hex(sheet.out[1][3])] = (seen[hex(sheet.out[1][3])] or 0) + 1
+    end
+    local pic = ctx.written[suit .. "/battle/redb.png"]
+    ok(pic ~= nil, suit .. " gets a portrait")
+    if pic then
+      eq(hex(pic.out[1][3]), OUTFIT[suit], "...in the same outfit")
+      eq(hex(pic.out[7][3]), PIC_LIGHT[suit], "...over its own light shade")
+    end
+  end
+
+  -- nine outfits, not one repeated: a table that fell back to green
+  -- everywhere would pass every check above except this one
+  local distinct = 0
+  for _ in pairs(seen) do distinct = distinct + 1 end
+  eq(distinct, 9, "nine suits are nine different outfits")
+
+  -- and green is untouched by all of it -- it is the default and the cart's
+  -- own colour, so its files have to come out exactly as they did before
+  -- there was a table to look them up in
+  local green = ctx.written["green/sprites/red.png"]
+  eq(hex(green.out[2][3]), "e6f4dc", "green's bill is the one it always had")
+end
+
 io.write("transforms.lua\n")
 do
   local ctx = runTransform(VANILLA)
@@ -579,7 +634,11 @@ do
     wrote[rel] = true
     count = count + 1
   end
-  eq(count, 8, "only what this cache carries is written")
+  -- Eight files for green, and the same eight again for each of the other
+  -- eight suits: PLAYER is nine colours and every one of them is a full set
+  -- on disk, so switching colour is a path change at load rather than a
+  -- re-run of this recipe.
+  eq(count, 8 * 9, "every suit gets what this cache carries, and no more")
   ok(wrote["greenskin/battle/redb.png"] and wrote["greenskin/trainer_card/red.png"],
     "...and every portrait gets a skinned twin beside it")
   ok(not wrote["greenskin/sprites/red.png"],
@@ -599,10 +658,35 @@ do
   ok(not wrote["green/sprites/oak.png"], "Oak is left alone")
 
   -- nothing lands on a cache path, which is what keeps the RED switch alive
-  for rel in pairs(ctx.written) do
-    ok(rel:sub(1, 6) == "green/" or rel:sub(1, 10) == "greenskin/",
-      rel .. " is under a prefix that shadows nothing")
+  local SUIT_NAMES = { "green", "orange", "blue", "purple", "yellow",
+                       "pink", "black", "white", "grey" }
+  local PREFIXES = {}
+  for _, name in ipairs(SUIT_NAMES) do
+    PREFIXES[name .. "/"] = true
+    PREFIXES[name .. "skin/"] = true
   end
+  local stray = nil
+  for rel in pairs(ctx.written) do
+    local prefix = rel:match("^([^/]+/)")
+    if not (prefix and PREFIXES[prefix]) then stray = rel break end
+  end
+  ok(stray == nil,
+    "every file is under a suit prefix, which shadows nothing: "
+    .. tostring(stray or "none stray"))
+
+  -- and every suit really got the whole set, not just the ones checked above
+  local missing = nil
+  for _, name in ipairs(SUIT_NAMES) do
+    for _, rel in ipairs({ "sprites/red.png", "sprites/red_bike.png",
+                           "battle/redb.png", "trainer_card/red.png" }) do
+      if not wrote[name .. "/" .. rel] then missing = name .. "/" .. rel end
+    end
+    if not wrote[name .. "skin/battle/redb.png"] then
+      missing = name .. "skin/battle/redb.png"
+    end
+  end
+  ok(missing == nil,
+    "all nine suits are written in full: " .. tostring(missing or "none missing"))
 
   local shades = ctx.written["green/sprites/red.png"].shades
   eq(#shades, 4, "the ramp is four colours")
