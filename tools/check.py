@@ -41,7 +41,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
 from palette import (EXTRA, PIC_RAMP, RAMP, SUITS, SUIT_ORDER,  # noqa: E402
-                     TITLE_RAMP, hexof)
+                     TITLE_RAMP, TITLE_SUITS, hexof)
 
 # (file, the table in it, what tools/palette.py says it must be)
 RAMPS = (
@@ -150,6 +150,45 @@ def check_suits():
                         " ".join(hexof(c) for c in SUITS[suit])))
 
 
+def check_title_suits():
+    """The ribbon band's nine pairs, in main.lua and in tools/palette.py.
+
+    Two colours per suit rather than three -- the shadow and the letter -- and
+    a fourth table to keep honest, for the same reason as the other three:
+    main.lua cannot import the Python, the Python cannot read the Lua, and a
+    pair that drifts is a title screen lettered in one colour on a cart named
+    after another.
+
+    Only main.lua carries a copy.  transforms.lua does not: the band is
+    lettering on white and no picture is recoloured to it, so the recipe has
+    no business knowing these numbers.
+    """
+    pair = re.compile(
+        r"([a-z]+)\s*=\s*\{\s*" + r"\s*,\s*".join([ROW.pattern] * 2) + r"\s*\}")
+    text = (ROOT / "main.lua").read_text(encoding="utf-8")
+    at = text.find("local TITLE_SUITS")
+    if at < 0:
+        fail("main.lua", "no TITLE_SUITS table to check")
+        return
+    found = {}
+    for match in pair.finditer(text[at:at + 3000]):
+        groups = match.groups()
+        found[groups[0]] = tuple(
+            tuple(int(c, 16) for c in groups[1 + i * 3:4 + i * 3])
+            for i in range(2))
+    if sorted(found) != sorted(TITLE_SUITS):
+        fail("main.lua", "TITLE_SUITS names are %s; tools/palette.py says %s"
+             % (" ".join(sorted(found)) or "(none)",
+                " ".join(sorted(TITLE_SUITS))))
+        return
+    for suit in SUIT_ORDER:
+        if found[suit] != TITLE_SUITS[suit]:
+            fail("main.lua", "title suit %s is %s; tools/palette.py says %s"
+                 % (suit,
+                    " ".join(hexof(c) for c in found[suit]),
+                    " ".join(hexof(c) for c in TITLE_SUITS[suit])))
+
+
 ENTRY = re.compile(r'\{\s*"([^"]+)"\s*,\s*(true|false)\s*\}')
 
 
@@ -200,6 +239,7 @@ def check_generated():
 def main():
     check_palettes()
     check_suits()
+    check_title_suits()
     check_extras()
     check_pics()
     check_generated()
@@ -207,8 +247,8 @@ def main():
         print("check: %s" % finding)
     if findings:
         return 1
-    print("check: palettes and all %d suits agree, the ribbon is "
-          "current" % len(SUITS))
+    print("check: palettes and all %d suits agree (outfit and band both), "
+          "the ribbon is current" % len(SUITS))
     return 0
 
 

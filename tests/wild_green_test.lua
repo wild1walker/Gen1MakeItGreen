@@ -776,7 +776,8 @@ end
 
 local function fakeMod(options)
   local log = {}
-  local mod = { log = {}, calls = log, hooks = { wrapped = {} } }
+  local mod = { log = {}, calls = log, exports = {},
+                hooks = { wrapped = {} } }
   function mod.hooks:wrap(name, fn)
     self.wrapped[name] = fn
     log[#log + 1] = "wrap " .. name
@@ -789,10 +790,26 @@ local function fakeMod(options)
     defined = nil,
     define = function(self, rows) self.defined = rows end,
     get = function(_, key) return options[key] end,
+    -- The engine writes the value where the reader will find it, so the stub
+    -- does too -- otherwise a test could not tell a row that was really
+    -- turned from one whose write went nowhere.
+    set = function(_, key, value) options[key] = value end,
   }
   mod.assets = {
     path = function(_, rel) return "mods/wild_green/" .. rel end,
   }
+  -- PLAYER is live, so the mod listens for mod.options_changed.  The stub
+  -- keeps the listeners so a test can fire one, which is the only way to
+  -- exercise a row that used to need a relaunch.
+  mod.events = { listeners = {} }
+  function mod.events:on(name, fn)
+    self.listeners[name] = self.listeners[name] or {}
+    table.insert(self.listeners[name], fn)
+    log[#log + 1] = "on " .. name
+  end
+  function mod.events:emit(name, payload)
+    for _, fn in ipairs(self.listeners[name] or {}) do fn(payload) end
+  end
   mod.DELETE = DELETE            -- src/mods/Loader.lua:1180
 
   mod.content = {
@@ -829,6 +846,41 @@ local function run(options)
   local mod = fakeMod(options)
   chunk(MOD .. "main.lua")(mod)
   return mod
+end
+
+-- The zone list TitleState:sgbPalettes returns, in its own order and shape:
+-- the logo band across tile rows 0-7, the version ribbon across 8-9, the mon,
+-- the figure, the ball and the copyright line across 10-17, and the
+-- CONTINUE / NEW GAME frame's own box zone after them.
+--
+-- The palettes are the ADVANCED pack's, because that is the mode the two
+-- registry overrides cannot reach and the one this hook exists for:
+-- data/palettes_gbc's LOGO1 letters the ribbon in #8cbd52 on #f7f78c -- a
+-- yellow -- and its MEWMON paints shade 1 #ef9c6b, a skin tone, onto the
+-- ball and the copyright line.
+local function advancedTitleZones()
+  local function zone(colors, x, y, w, h)
+    return { colors = colors, x = x, y = y, w = w, h = h }
+  end
+  return {
+    zone({ { 255, 255, 255 }, { 230, 197, 0 }, { 148, 156, 148 },
+           { 41, 99, 181 } }, 0, 0, 160, 64),
+    zone({ { 255, 255, 255 }, { 247, 247, 140 }, { 140, 189, 82 },
+           { 173, 0, 33 } }, 0, 64, 160, 16),
+    zone({ { 255, 255, 255 }, { 239, 156, 107 }, { 115, 33, 165 },
+           { 0, 0, 0 } }, 0, 80, 160, 64),
+    -- the main menu's frame: a narrow box, not a band
+    zone({ { 255, 255, 255 }, { 170, 170, 170 }, { 85, 85, 85 },
+           { 0, 0, 0 } }, 0, 0, 104, 96),
+  }
+end
+
+local function hex(c) return ("%02x%02x%02x"):format(c[1], c[2], c[3]) end
+
+local function zonesThrough(mod, zones)
+  local wrapped = mod.hooks.wrapped["render.zones"]
+  if not wrapped then return nil end
+  return wrapped(function(_, z) return z end, {}, zones)
 end
 
 io.write("main.lua -- PLAYER = GREEN\n")
@@ -900,11 +952,16 @@ do
     "versionRibbon, not version -- ours is one continuous strip")
 
   -- The title figure has no per-image seam, so it is coloured by its zone
-  -- palette instead: MEWMON, in the character's own four.
+  -- palette instead: MEWMON, which is the whole of tile rows 10-17 and not
+  -- just him -- the cycling mon, the POKE BALL and the copyright line are in
+  -- that band too.  So it takes the PORTRAIT four, whose shade 2 is a light
+  -- rather than a face: painting that shade skin put a skin-coloured half on
+  -- the ball and lettered GAME FREAK's line in skin.
   local mew = mod.content.palettes.overrides.MEWMON
   ok(mew ~= nil, "MEWMON is overridden, which is what colours the title figure")
   eq(mew and ("%02x%02x%02x"):format(mew[2][1], mew[2][2], mew[2][3]),
-    "f0a363", "...with the character's skin")
+    "a8dd8a", "...with the portrait's light shade, NOT the character's skin: "
+    .. "the ball and the copyright line wear this band too")
   eq(mew and ("%02x%02x%02x"):format(mew[3][1], mew[3][2], mew[3][3]),
     "65ba3f", "...and the character's outfit green")
 
@@ -1008,8 +1065,17 @@ do
   local mod = run({ player = "red", ribbon = true })
   ok(next(mod.content.sprites.patches) == nil,
     "no sprite is repointed: the character is vanilla again")
-  ok(mod.hooks.wrapped["player.sprite"] == nil,
-    "player.sprite is not even wrapped, so the pics stay vanilla")
+  -- Wrapped, unlike every version before PLAYER went live.  It has to be:
+  -- the row can be moved OFF red as well as onto it, and a hook that was
+  -- never registered because the game booted red cannot be talked into
+  -- existing later.  What makes RED still RED is that the link declines.
+  local sprite = mod.hooks.wrapped["player.sprite"]
+  ok(sprite ~= nil, "player.sprite IS wrapped, because RED is a value the "
+    .. "row can be moved off")
+  eq(sprite and sprite(function(p) return p end,
+       "assets/generated/battle/redb.png", {}),
+    "assets/generated/battle/redb.png",
+    "...and it declines, so the pics stay vanilla")
   ok(mod.content.palettes.overrides.MEWMON == nil,
     "and the title figure is red again with him")
   ok(mod.content.field.patches.boot == nil
@@ -1148,6 +1214,10 @@ local function titleScreen(options, mode, lazy, cache)
   function TitleState:draw()
     inner.draws = inner.draws + 1
     inner.drew = self.player
+    -- MainMenu's ClearScreen: the real draw fills the screen white and
+    -- returns the moment the CONTINUE / NEW GAME menu is open, so nothing of
+    -- the title is on screen from then on (TitleState.lua:711-715)
+    if self.menuOpen then return end
     -- the stub's title tables are plain, so reach the wrapper by name the
     -- way the engine reaches it through TitleState's metatable
     if not self.skipSprite then TitleState.currentSprite(self) end
@@ -1283,6 +1353,38 @@ do
 end
 
 io.write("main.lua -- reading an Image's pixels back\n")
+do
+  io.write("the figure's rect is not marked while the menu is open\n")
+  -- The white square, from a phone screenshot of the CONTINUE menu in DARK.
+  --
+  -- This wrap marks the figure's rectangle BEFORE calling the real draw,
+  -- because that draw reads `self.player` at its top and the mark has to be
+  -- in for the frame that reads it.  But the same draw fills the screen white
+  -- and returns the moment the menu is open -- so on a menu frame the mark
+  -- landed over a patch of screen with nothing on it, and a true-colour rect
+  -- is re-blitted RAW from the canvas.  The canvas there is the white fill.
+  --
+  -- White on white for as long as this cart had no dark mode, which is why it
+  -- went unnoticed: under UI THEME = DARK it is a white rectangle at 82,80
+  -- sitting on a black CONTINUE menu.
+  local screen = titleScreen({ player = "green", ribbon = true }, "redpp")
+
+  local playing = { player = screen.raw }
+  screen.TitleState.draw(playing)
+  ok(#screen.marks > 0, "the title itself still marks the figure")
+  eq(screen.marks[1].x, 82, "at the rect the engine draws him in")
+  eq(screen.marks[1].y, 80, "...both ways")
+
+  local before = #screen.marks
+  local menu = { player = screen.raw, menuOpen = true }
+  screen.TitleState.draw(menu)
+  eq(#screen.marks, before, "and marks nothing once the menu has cleared him")
+
+  -- the picture is still asserted, so the frame the menu closes on is right
+  ok(menu.player ~= nil and menu.player ~= screen.raw,
+     "the green copy is still put on the instance, ready for the way back")
+end
+
 do
   -- 1.4.0 called Image:getData and gave up when it was not there.  Under
   -- LOVE 11 it never is: the texture does not keep the ImageData it was
@@ -1580,7 +1682,7 @@ do
     .. "un-exempt would be a worse bug than the one being fixed")
 end
 
-io.write("main.lua -- PLAYER = RED wraps nothing\n")
+io.write("main.lua -- PLAYER = RED declines everything\n")
 do
   local screen = darkScreen({ player = "red", ribbon = true })
   local red = { def = { image = "assets/generated/sprites/red.png",
@@ -1690,6 +1792,148 @@ end
 
 _G.love.graphics.newQuad = hadQuad
 if not hadLove then _G.love = nil end
+
+
+io.write("main.lua -- the title bands under ADVANCED\n")
+do
+  local mod = run({ player = "green", ribbon = true, title_figure = true })
+  local zones = zonesThrough(mod, advancedTitleZones())
+  ok(zones ~= nil, "render.zones is wrapped")
+
+  -- Shade 2 is the word and shade 3 the shadow under it, which is the way
+  -- round it has been since 0.4.0 -- the word takes the character's own
+  -- green and the dark green went to the shadow.  Both are the band's
+  -- numbers rather than ADVANCED's pack, which is what this case is for.
+  eq(zones and hex(zones[2].colors[2]), "65ba3f",
+    "the ribbon's letter is the character's own green, not the pack's "
+    .. "#f7f78c")
+  eq(zones and hex(zones[2].colors[3]), "14571f",
+    "and its shadow is the dark green, not the pack's #8cbd52 yellow")
+
+  eq(zones and hex(zones[3].colors[2]), "a8dd8a",
+    "the ball and the copyright line take the portrait's light shade, not "
+    .. "the pack's #ef9c6b skin")
+  eq(zones and hex(zones[3].colors[3]), "65ba3f",
+    "...and the outfit green, not the pack's purple")
+
+  eq(zones and hex(zones[4].colors[4]), "000000",
+    "the main menu's frame is not a band and keeps its own black ink")
+end
+
+io.write("main.lua -- the zone hook only answers for the title screen\n")
+do
+  local mod = run({ player = "green", ribbon = true })
+  -- one band on its own is not the packet: the party menu's HP-bar zones sit
+  -- at rects of their own and must come back untouched
+  local zones = zonesThrough(mod, {
+    { colors = { { 1, 1, 1 }, { 2, 2, 2 }, { 3, 3, 3 }, { 4, 4, 4 } },
+      x = 0, y = 64, w = 160, h = 16 },
+  })
+  eq(zones and hex(zones[1].colors[3]), "030303",
+    "a lone 160x16 zone at y=64 is left exactly as it came")
+end
+
+io.write("main.lua -- the ribbon follows PLAYER\n")
+do
+  local mod = run({ player = "purple", ribbon = true })
+  local logo = mod.content.palettes.overrides.LOGO1
+  eq(logo and hex(logo[2]), "8a5bd0",
+    "LOGO1 letters the band in purple's own outfit, not green's")
+  eq(logo and hex(logo[3]), "54377e", "...over purple's band shadow")
+
+  local zones = zonesThrough(mod, advancedTitleZones())
+  eq(zones and hex(zones[2].colors[3]), "54377e",
+    "and the band under ADVANCED is purple too")
+
+  local mew = mod.content.palettes.overrides.MEWMON
+  eq(mew and hex(mew[3]), "8a5bd0", "the figure band wears purple's outfit")
+  eq(mew and hex(mew[2]), "bfa5e5", "...over purple's portrait light")
+  eq(mew and hex(mew[1]), "ffffff", "paper does not move")
+  eq(mew and hex(mew[4]), "000000", "and neither does ink")
+end
+
+io.write("main.lua -- PLAYER is live\n")
+do
+  local options = { player = "green", ribbon = true, title_figure = true }
+  local mod = fakeMod(options)
+  chunk(MOD .. "main.lua")(mod)
+
+  eq(hex(zonesThrough(mod, advancedTitleZones())[2].colors[3]), "14571f",
+    "the band starts green")
+
+  -- what the mod manager does when the row is turned: write the value, then
+  -- emit.  Nothing is reloaded and nothing is relaunched.
+  options.player = "orange"
+  mod.events:emit("mod.options_changed",
+    { mod = mod, key = "player", value = "orange" })
+
+  local zones = zonesThrough(mod, advancedTitleZones())
+  eq(hex(zones[2].colors[3]), "78370f",
+    "and is orange on the very next frame, with no relaunch")
+  eq(hex(zones[3].colors[3]), "e2681c",
+    "...as is the figure band")
+
+  local through = mod.hooks.wrapped["player.sprite"]
+  eq(through(function(p) return p end,
+             "assets/generated/battle/redb.png", {}),
+    "assets/generated/orangeskin/battle/redb.png",
+    "and the pictures are read out of the new suit's prefix")
+
+  mod.events:emit("mod.options_changed",
+    { mod = mod, key = "colors", value = "gbc" })
+  eq(hex(zonesThrough(mod, advancedTitleZones())[2].colors[3]), "78370f",
+    "a row this mod does not own moves nothing")
+end
+
+io.write("main.lua -- PORTRAIT SKIN is live too\n")
+do
+  local options = { player = "green", ribbon = true, portrait_skin = true }
+  local mod = fakeMod(options)
+  chunk(MOD .. "main.lua")(mod)
+  local through = mod.hooks.wrapped["player.sprite"]
+  eq(through(function(p) return p end,
+             "assets/generated/battle/redb.png", {}),
+    "assets/generated/greenskin/battle/redb.png", "the skinned copy first")
+
+  options.portrait_skin = false
+  mod.events:emit("mod.options_changed",
+    { mod = mod, key = "portrait_skin", value = false })
+  eq(through(function(p) return p end,
+             "assets/generated/battle/redb.png", {}),
+    "assets/generated/green/battle/redb.png",
+    "and the flat copy the moment the row moves")
+end
+
+
+io.write("main.lua -- what the bench drives\n")
+do
+  local options = { player = "green", ribbon = true, title_figure = true }
+  local mod = fakeMod(options)
+  chunk(MOD .. "main.lua")(mod)
+
+  local suits = mod.exports.suits
+  ok(type(suits) == "function", "the suits are published")
+  eq(#suits(), 10, "all ten of them, RED included")
+  eq(suits()[1], "green", "green first, because it is the default")
+
+  eq(mod.exports.suit(), "green", "and the current one can be read")
+
+  ok(mod.exports.setSuit("purple"), "the bench can turn the row")
+  eq(mod.exports.suit(), "purple", "...and it turns")
+  eq(options.player, "purple",
+    "through mod.options:set, so the manager and the save see it too -- not "
+    .. "into an upvalue only this mod can read")
+
+  local zones = zonesThrough(mod, advancedTitleZones())
+  eq(hex(zones[2].colors[3]), "54377e",
+    "the title screen follows it on the very next frame")
+
+  ok(not mod.exports.setSuit("chartreuse"),
+    "a colour that is not a suit is refused")
+  eq(mod.exports.suit(), "purple", "and nothing moves")
+  ok(mod.exports.setSuit("red"), "RED is a suit the row can be set to")
+  eq(mod.exports.suit(), "red", "...because it is a value, not an absence")
+end
 
 io.write(("\n%d passed, %d failed\n"):format(passed, failed))
 os.exit(failed == 0 and 0 or 1)

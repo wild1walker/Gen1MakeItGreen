@@ -68,13 +68,18 @@ return function(mod)
     { 0x00, 0x00, 0x00 },
   }
 
-  -- The ribbon band is lettering on white, not a sprite, so it does not use
-  -- the character ramp.  It gets its own four, and both greens are dark
-  -- enough to read as ink at 8px: 1.0.0 lent it the character's light green
-  -- and it washed out on the title screen.
+  -- The ribbon band is lettering on white and not a sprite, so it does not
+  -- use the character ramp -- but it is lettered in the character's OWN
+  -- green, in shade 2.
+  --
+  -- Shade 3 is not in the art any more.  0.12.0 traced the game's own ribbon
+  -- face off Version_GFX, which is 1bpp -- two colours, one ink -- and a
+  -- shadow under a five-row letter reads as smear rather than as weight.  The
+  -- palette still carries the darker green because the cartridge shell is
+  -- that number.  tools/ribbon.py draws the art.
   local WILD_GREEN_TITLE = {
     { 0xff, 0xff, 0xff },
-    { 0x2e, 0x8b, 0x3a },
+    { 0x65, 0xba, 0x3f },
     { 0x14, 0x57, 0x1f },
     { 0x00, 0x00, 0x00 },
   }
@@ -100,6 +105,30 @@ return function(mod)
     black  = { { 0x3d, 0x3d, 0x45 }, { 0x94, 0x94, 0x99 }, { 0xde, 0xde, 0xdf } },
     white  = { { 0xcd, 0xd3, 0xda }, { 0xe4, 0xe9, 0xee }, { 0x85, 0x89, 0x8e } },
     grey   = { { 0x8b, 0x91, 0x99 }, { 0xbf, 0xc2, 0xc7 }, { 0xeb, 0xec, 0xee } },
+  }
+
+  -- The ribbon band in each suit, as (letter, shadow).  A copy of the table
+  -- in tools/palette.py, which cannot be imported from -- tools/check.py
+  -- fails the build if the two drift apart.
+  --
+  -- The letter IS the suit's outfit: a player who has put the character in
+  -- purple should read a purple version line, in the same purple, and not in
+  -- a purple chosen for it.  The only limit is that no letter is paler than
+  -- GREEN's own outfit, which binds on exactly two of the nine -- YELLOW and
+  -- WHITE come down to it, the other seven are used as they are.  The shadow
+  -- is that outfit at a fixed dark lightness and is unchanged from 0.3.0,
+  -- where it was the letter; green's is the pair the cart shell is named
+  -- after and has not moved.  palette.py carries the derivation.
+  local TITLE_SUITS = {
+    green  = { { 0x65, 0xba, 0x3f }, { 0x14, 0x57, 0x1f } },
+    orange = { { 0xe2, 0x68, 0x1c }, { 0x78, 0x37, 0x0f } },
+    blue   = { { 0x3f, 0x7b, 0xd8 }, { 0x24, 0x46, 0x7a } },
+    purple = { { 0x8a, 0x5b, 0xd0 }, { 0x54, 0x37, 0x7e } },
+    yellow = { { 0xc2, 0xa4, 0x2f }, { 0x4f, 0x43, 0x14 } },
+    pink   = { { 0xee, 0x7b, 0xb8 }, { 0x68, 0x36, 0x50 } },
+    black  = { { 0x3d, 0x3d, 0x45 }, { 0x2a, 0x2a, 0x30 } },
+    white  = { { 0xa2, 0xa7, 0xac }, { 0x41, 0x43, 0x45 } },
+    grey   = { { 0x8b, 0x91, 0x99 }, { 0x40, 0x43, 0x46 } },
   }
 
   mod.options:define({
@@ -144,32 +173,53 @@ return function(mod)
     return value
   end
 
-  -- Which suit, and the two prefixes its files live under.  RED is not a
-  -- suit: it is the vanilla cache with nothing done to it, so it has no
-  -- prefix and every swap below declines.  A stored value this build does
-  -- not know -- a save from a version with a colour that has since gone --
-  -- falls back to the default rather than pointing at files nobody wrote.
-  local suit = option("player", "green")
-  if suit ~= "red" and not SUITS[suit] then suit = "green" end
-  local green = suit ~= "red"
+  -- ------- which suit, and everything that follows from it
+  --
+  -- Recomputed rather than settled once, because PLAYER is live now: the row
+  -- used to say "takes effect on the next launch" for the overworld walker,
+  -- and a colour picker you have to reboot to see is a colour picker nobody
+  -- turns twice.  `wear` is the whole of what a suit decides, in one place,
+  -- and `relive` further down is what carries a second call of it out to the
+  -- art already on screen.
+  --
+  -- RED is not a suit: it is the vanilla cache with nothing done to it, so it
+  -- has no prefix and every swap below declines.  A stored value this build
+  -- does not know -- a save from a version with a colour that has since gone
+  -- -- falls back to the default rather than pointing at files nobody wrote.
+  local suit, green, PREFIX, SKINNED
+  local WORN_RAMP, WORN_PIC, WORN_TITLE
   -- the same portraits with the face painted skin.  A second set of files
   -- rather than a second recipe: the recipe runs at install and never sees
   -- the options, so both are written and this picks between them.
-  local PREFIX = CACHE .. suit .. "/"
-  local SKINNED = CACHE .. suit .. "skin/"
+  local skinned
 
-  -- The chosen suit's own two ramps: the four that never change, with the
-  -- outfit and the portrait's light swapped in -- so a suit can never move
-  -- the skin.  GREEN takes the two named tables above as they are rather
-  -- than rebuilding them, which is what makes the default provably the same
-  -- object it has always been.  RED reaches neither of the places these are
-  -- used.
-  local WORN_RAMP, WORN_PIC = WILD_GREEN, WILD_GREEN_PIC
-  local WORN = SUITS[suit]
-  if WORN and suit ~= "green" then
-    WORN_RAMP = { WILD_GREEN[1], WILD_GREEN[2], WORN[1], WILD_GREEN[4] }
-    WORN_PIC = { WILD_GREEN[1], WORN[2], WORN[1], WILD_GREEN[4] }
+  local function wear(name)
+    suit = name
+    if suit ~= "red" and not SUITS[suit] then suit = "green" end
+    green = suit ~= "red"
+    PREFIX = CACHE .. suit .. "/"
+    SKINNED = CACHE .. suit .. "skin/"
+    skinned = option("portrait_skin", true)
+
+    -- The chosen suit's three ramps: the four that never change, with the
+    -- outfit, the portrait's light and the band's two swapped in -- so a suit
+    -- can never move the skin.  GREEN takes the named tables above as they
+    -- are rather than rebuilding them, which is what makes the default
+    -- provably the same object it has always been.  RED reaches none of the
+    -- places these are used.
+    WORN_RAMP, WORN_PIC, WORN_TITLE =
+      WILD_GREEN, WILD_GREEN_PIC, WILD_GREEN_TITLE
+    local WORN, BAND = SUITS[suit], TITLE_SUITS[suit]
+    if WORN and suit ~= "green" then
+      WORN_RAMP = { WILD_GREEN[1], WILD_GREEN[2], WORN[1], WILD_GREEN[4] }
+      WORN_PIC = { WILD_GREEN[1], WORN[2], WORN[1], WILD_GREEN[4] }
+    end
+    if BAND and suit ~= "green" then
+      WORN_TITLE = { WILD_GREEN[1], BAND[1], BAND[2], WILD_GREEN[4] }
+    end
   end
+
+  wear(option("player", "green"))
 
   -- Exactly the pictures transforms.lua recolours, and the only ones this
   -- will swap.  It is the same list, in the same order, and tools/check.py
@@ -205,14 +255,25 @@ return function(mod)
   -- fails closed to the monochrome copy when it cannot find exactly one.
   --
   -- So this is a choice between two files that both exist, not a recolour
-  -- decided here.  Off is exactly 1.4.0's picture.
-  local skinned = option("portrait_skin", true)
+  -- decided here.  Off is exactly 1.4.0's picture.  `wear` reads the row, so
+  -- switching it moves the same pictures PLAYER does and at the same moment.
 
-  -- The green twin of a cache path, or nil when there is not one.
-  local function greenOf(path)
+  -- The cache-relative name of a picture the recipe recolours, or nil.  Told
+  -- apart from greenOf below because it answers in EVERY suit, RED included:
+  -- the record sweep has to recognise the vanilla walker in order to have
+  -- something to repoint when the row later moves off RED.
+  local function cacheRel(path)
     if type(path) ~= "string" then return nil end
     local rel = path:match("^" .. CACHE .. "(.+)$")
     if not rel or not KNOWN[rel] then return nil end
+    return rel
+  end
+
+  -- The green twin of a cache path, or nil when there is not one.
+  local function greenOf(path)
+    if not green then return nil end
+    local rel = cacheRel(path)
+    if not rel then return nil end
     if skinned and PORTRAIT[rel] then return SKINNED .. rel end
     return PREFIX .. rel
   end
@@ -229,8 +290,26 @@ return function(mod)
   end
 
   -- ------- the character
+  --
+  -- Installed whatever the row says, and `do` rather than `if green then` for
+  -- exactly that reason: PLAYER is live, so RED is a value the row can be
+  -- moved OFF as well as onto, and a hook that was never registered because
+  -- the game booted red cannot be talked into existing later.  Every piece
+  -- inside declines on its own while the suit is RED -- greenOf answers nil
+  -- and the sweep repoints nothing -- which is the same picture the gate used
+  -- to give and one that can change its mind.
 
-  if green then
+  -- id -> the image its record shipped with, for every record this could ever
+  -- repoint, and the set of paths this mod is drawing.  Hoisted out of the
+  -- block because `relive` below is what a live PLAYER change runs, and it
+  -- walks both.
+  local walkers, greenArt = {}, {}
+  -- and the paths the player.sprite hook has already reported, so a suit
+  -- change logs its new pictures instead of going quiet on the grounds that
+  -- it has spoken about that pic before.
+  local seen = {}
+
+  do
     -- The battle back pic, and the front pic Oak's intro, the trainer card
     -- and the Hall of Fame share.  ctx.demo is the catch tutorial's old man
     -- and ctx.oakDemo is Yellow's PROF.OAK -- neither is the player, and
@@ -240,7 +319,6 @@ return function(mod)
     -- tell from outside whether the hook never ran, or ran and declined a
     -- path that is not shaped the way this expects.  One line per pic per
     -- session answers that without a debugger.
-    local seen = {}
     local function note(path, ctx, verdict)
       if seen[path] then return end
       seen[path] = true
@@ -278,6 +356,10 @@ return function(mod)
         note(path, ctx, "left alone: not the player")
         return next(path, ctx)
       end
+      if not green then
+        note(path, ctx, "left alone: PLAYER is RED")
+        return next(path, ctx)
+      end
       local swapped = greenOf(path)
       if not swapped then
         note(path, ctx, "NOT SWAPPED: outside " .. CACHE)
@@ -295,13 +377,17 @@ return function(mod)
     -- import wrote one, the BICYCLE sheet.  Found by image rather than by id
     -- so a name this mod guessed wrong is simply not matched.  A walker
     -- another mod has already reskinned points outside the cache, so
-    -- greenOf declines it and this does not fight over it.
-    local greenArt = {}
-
+    -- cacheRel declines it and this does not fight over it.
+    --
+    -- `walkers` remembers the image each record shipped with even when the
+    -- suit is RED and nothing is repointed, because that is the list `relive`
+    -- walks when the row moves -- including the move back to RED, which is a
+    -- restore and needs the vanilla path to restore TO.
     try("sprites", function()
       for id, def in mod.content.sprites:each() do
         local image = type(def) == "table" and def.image
-        if type(image) == "string" and image:match("red") then
+        if type(image) == "string" and cacheRel(image) then
+          walkers[id] = image
           local swapped = greenOf(image)
           if swapped then
             mod.content.sprites:patch(id, { image = swapped, trueColor = true })
@@ -714,6 +800,18 @@ return function(mod)
       local ok, image = pcall(Assets.image, swapped)
       if not (ok and image) then return nil end
       pcall(image.setFilter, image, "nearest", "nearest")
+      -- ------- and say where it came from
+      --
+      -- Gen1WildUI puts a one-pixel white pad round the title art on a dark
+      -- ground, and it bakes that pad from a FILE -- reading the picture back
+      -- off the GPU instead is what wrecked two of its releases.  A file it
+      -- can only find if it is told: `title.playerPath` is still the RED
+      -- figure's path, because that is the one TitleState loaded, and baking
+      -- THAT would put the red suit back over this one.
+      --
+      -- So the derived copy names itself.  Nothing here depends on anyone
+      -- reading it.
+      title.__gen1WildPlayerPath = swapped
       return image
     end
 
@@ -769,6 +867,8 @@ return function(mod)
                 local raw = rawOf(title)
                 if not raw then return end      -- nothing to work from yet
                 title.__wildGreenBaked = greenBake(raw) or false
+                -- a bake, not a file: there is no path to hand anyone
+                title.__gen1WildPlayerPath = nil
                 -- the line 1.4.0 needed: the wrap succeeded there and the
                 -- BAKE was what failed, silently, a frame later
                 mod.log:info("title figure: %s", title.__wildGreenBaked
@@ -801,7 +901,26 @@ return function(mod)
         -- "ball", so in that phase nothing marked it and the figure went
         -- purple no matter who had set the picture.  Marking the same rect
         -- twice in a frame costs nothing; not marking it at all costs this.
-        if mark and type(PaletteFX.markTrueColor) == "function" then
+        -- ...but only when the draw about to run will actually put him
+        -- there.  `TitleState:draw` opens with a white fill of the whole
+        -- screen and then `if self.menuOpen then return end` -- MainMenu's
+        -- own ClearScreen, which wipes the logo, the mon and the figure
+        -- before the CONTINUE / NEW GAME border goes down.  This wrap marks
+        -- BEFORE calling it, because the same call reads `self.player` at its
+        -- top; on a menu frame that left a true-colour rect over a patch of
+        -- screen with nothing on it, and a true-colour rect is re-blitted RAW
+        -- from the canvas.  The canvas there is the white fill.
+        --
+        -- White on white for as long as this cart had no dark mode, which is
+        -- why it went unnoticed: under UI THEME = DARK it is a white rectangle
+        -- at 82,80 sitting on a black CONTINUE menu.
+        --
+        -- The rule this is an instance of, for the next one: MARK AFTER YOU
+        -- DRAW.  Every other mark in this suite is emitted by the line after
+        -- the draw it belongs to and cannot be wrong about whether the art is
+        -- there; this one has to run first, so it has to ask.
+        if mark and not title.menuOpen
+            and type(PaletteFX.markTrueColor) == "function" then
           local okDim, w, h = pcall(baked.getDimensions, baked)
           if okDim and w and h then
             pcall(PaletteFX.markTrueColor, FIGURE_X, FIGURE_Y, w, h)
@@ -867,9 +986,27 @@ return function(mod)
     return "wrapped"
   end
 
+  -- ------- MEWMON is the band, not the face
+  --
+  -- MEWMON colours tile rows 10-17, and that band is not just the figure: the
+  -- cycling mon, the POKE BALL between him and the logo, and the copyright
+  -- line along the bottom are all inside it.  It used to be overridden with
+  -- WORN_RAMP -- the OVERWORLD four, whose shade 2 is the character's skin --
+  -- on the reasoning that the figure is the thing being coloured.  He is not
+  -- the only thing being coloured, and the shade means something else on
+  -- everything else in the band: the ball came out with a skin-coloured
+  -- half, and GAME FREAK's line at the bottom was lettered in skin.  That is
+  -- what "part of the pokeball is skin color, the words at the bottom are
+  -- skin color highlights too" is.
+  --
+  -- So the band takes WORN_PIC, the PORTRAIT four, whose shade 2 is a light
+  -- rather than a face.  It is already what the figure is baked to under
+  -- ADVANCED, so the two modes now agree about him as well -- and the face on
+  -- the big pictures is PORTRAIT SKIN's job, which paints a file rather than
+  -- a palette and is unaffected either way.
   if green and option("title_figure", true) then
     try("palettes.MEWMON", function()
-      mod.content.palettes:override("MEWMON", WORN_RAMP)
+      mod.content.palettes:override("MEWMON", WORN_PIC)
     end)
     try("title.figure", function()
       mod.log:info("title figure under REDPP: %s", tostring(wrapTitleFigure()))
@@ -879,16 +1016,252 @@ return function(mod)
   if option("ribbon", true) then
     -- The ribbon art is grey, because the band it lands in is an SGB palette
     -- zone: TitleState:sgbPalettes colours tile rows 8-9 with LOGO1 and the
-    -- shader remaps by shade.  So the green comes from here.
+    -- shader remaps by shade.  So the colour comes from here.
     --
-    -- This is the one thing in the mod that does not reach every display
-    -- mode.  PaletteFX.pal short-circuits every name to the boot-ROM palette
-    -- under OG RED, and reads data/palettes_gbc under ADVANCED, so in those
-    -- two the band wears the mode's own colour and the lettering is red.
-    -- DIFFERENCES.md says so.
+    -- WORN_TITLE, not WILD_GREEN_TITLE: the band follows PLAYER now.  It used
+    -- to be green in every suit on the grounds that WILD GREEN VERSION is the
+    -- game's name rather than the character's jacket, and in front of a
+    -- player who has just put the character in purple that reads as a setting
+    -- that did not take.  The WORDS still say GREEN; only the ink moves.
     try("palettes.LOGO1", function()
-      mod.content.palettes:override("LOGO1", WILD_GREEN_TITLE)
+      mod.content.palettes:override("LOGO1", WORN_TITLE)
     end)
+  end
+
+  -- ------- the two title bands, in every display mode
+  --
+  -- The two overrides above are registry records, and a registry record is
+  -- not how every display mode asks for a palette.  PaletteFX.pal
+  -- short-circuits every NAME to the boot-ROM pair under OG RED and reads
+  -- data/palettes_gbc under ADVANCED -- so in those two modes neither
+  -- override is consulted at all, and the title screen wears the mode's own
+  -- LOGO1 and MEWMON out of that pack:
+  --
+  --     LOGO1  = white / #f7f78c / #8cbd52 / #ad0021
+  --     MEWMON = white / #ef9c6b / #7321a5 / black
+  --
+  -- The ribbon draws its letter in shade 2 and its shadow in shade 1, so
+  -- under ADVANCED the lettering came out #8cbd52 on #f7f78c -- a yellow-green
+  -- word with a pale yellow shadow, which is exactly the "it is like a
+  -- yellow right now?" this fixes.  And MEWMON's shade 1 there is #ef9c6b, a
+  -- skin tone, which is the ball's light half and the copyright line's
+  -- highlight along the bottom of the screen.
+  --
+  -- Nothing a NAMED palette can say reaches those modes.  A zone is a
+  -- different thing: `render.zones` is handed the finished list on the way to
+  -- the blit, after the state has resolved every name, so replacing the
+  -- colours of the two bands there lands in every mode that colours at all.
+  -- The three deliberately monochrome modes (OG, OG INV, CLASSIC) substitute
+  -- the whole screen downstream in PaletteFX.effectiveColors and are left to
+  -- do it -- a mono mode asked for one palette, not ours.
+  --
+  -- The three bands TitleState:sgbPalettes returns, in its own order:
+  -- the logo across tile rows 0-7, the version ribbon across 8-9, and the
+  -- mon, the figure, the ball and the copyright line across 10-17.
+  local LOGO_BAND = { y = 0, h = 64 }
+  local RIBBON_BAND = { y = 64, h = 16 }
+  local FIGURE_BAND = { y = 80, h = 64 }
+
+  -- Which zone of a list is which band, or nil when the list is not the
+  -- title screen's.
+  --
+  -- By RECTANGLE, and by all three at once.  Not by palette identity, because
+  -- under ADVANCED the palettes in the list are the pack's and not ours --
+  -- that is the whole reason this exists.  Not by asking the stack what state
+  -- is on top either: that would mean requiring src.ui.TitleState to compare
+  -- against, and the shape is a better witness than the class is.  Three
+  -- full-width zones at y=0/64/80 with heights 64/16/64, in one list, is the
+  -- packet that screen sends and nothing else does -- the trailing UI-box
+  -- zones the CONTINUE / NEW GAME frame adds are narrow boxes at other rects
+  -- and are not matched, which is what keeps that menu's black ink black.
+  local function titleBands(zones)
+    local logo, ribbon, figure
+    for _, zone in ipairs(zones) do
+      -- colors == false is the trueColor opt-out and is a rect, not a
+      -- palette: the figure's own rectangle under ADVANCED is one of those,
+      -- and painting it would undo the bake it was cut out for.
+      if type(zone) == "table" and type(zone.colors) == "table"
+          and zone.x == 0 and zone.w == 160 then
+        if zone.y == LOGO_BAND.y and zone.h == LOGO_BAND.h then
+          logo = zone
+        elseif zone.y == RIBBON_BAND.y and zone.h == RIBBON_BAND.h then
+          ribbon = zone
+        elseif zone.y == FIGURE_BAND.y and zone.h == FIGURE_BAND.h then
+          figure = zone
+        end
+      end
+    end
+    if logo and ribbon and figure then return ribbon, figure end
+    return nil
+  end
+
+  -- Guarded, and reported once, for the reason the title screen is worth
+  -- getting right in the first place: it is the first thing anybody sees, and
+  -- a crash there is a game that does not start.  A band that fails to be
+  -- recoloured is a band in the display mode's own colour, which is what
+  -- every build before this one showed.
+  local bandsBroken = false
+
+  local function paintBands(game, zones)
+    if type(zones) ~= "table" or not zones[1] then return zones end
+
+    local wantsRibbon = option("ribbon", true)
+    local wantsFigure = green and option("title_figure", true)
+    if not (wantsRibbon or wantsFigure) then return zones end
+
+    local ribbon, figure = titleBands(zones)
+    if not ribbon then return zones end
+
+    if wantsRibbon then ribbon.colors = WORN_TITLE end
+    if wantsFigure then figure.colors = WORN_PIC end
+    return zones
+  end
+
+  mod.hooks:wrap("render.zones", function(nextLink, game, zones)
+    zones = nextLink(game, zones)
+    if bandsBroken then return zones end
+    local ok, out = pcall(paintBands, game, zones)
+    if ok then return out end
+    bandsBroken = true
+    mod.log:warn("the title bands stood down for this session: %s",
+      tostring(out))
+    return zones
+  end)
+
+  -- ------- PLAYER, applied where the player is standing
+  --
+  -- The row used to take effect on the next launch, for one reason: the
+  -- overworld walker is a `sprites` RECORD, records are folded into
+  -- Game.data once at load, and SpriteRenderer copies the image out of the
+  -- record when the Player is built.  Both of those are settled long before
+  -- anybody opens the menu.
+  --
+  -- Neither is a reason it has to STAY settled.  The recipe writes every
+  -- suit's files at install -- all nine, always -- so switching colour has
+  -- never been a question of generating anything; it is a question of which
+  -- path a record names.  So this repoints the folded record and rebuilds the
+  -- renderers that had already copied out of it, and the walker changes
+  -- colour under your feet.
+  --
+  -- What still waits for a relaunch, and why:
+  --
+  --   * the version ribbon's ARTWORK.  It is `field.boot.title`, read once
+  --     when the title screen is built, and the title screen is not on
+  --     screen when this row is turned.  Its COLOUR is live -- that goes
+  --     through the zone hook above, which runs every frame.
+  --   * the name list, which is boot data a save takes a copy of.
+  --
+  -- Everything else -- the walker, the bicycle sheet, the battle back pic,
+  -- the trainer card, Oak's intro, the credits, the Hall of Fame, the
+  -- town-map marker and the title figure -- is current on the next frame.
+  local function relive(why)
+    local ok, Game = pcall(require, "src.core.Game")
+    if not ok or type(Game) ~= "table" then return end
+    local data = Game.data
+    local records = type(data) == "table" and data.sprites or nil
+    if type(records) ~= "table" then return end
+
+    -- The record tables themselves, so the renderer sweep below can tell a
+    -- sheet this mod just moved from one another mod owns.
+    local touched = {}
+    for id, vanilla in pairs(walkers) do
+      local def = records[id]
+      if type(def) == "table" then
+        local swapped = greenOf(vanilla)
+        local want = swapped or vanilla
+        if def.image ~= want then
+          def.image = want
+          -- trueColor is what keeps our green out of the shade buckets; the
+          -- vanilla art wants it off again, or the palette pass stops
+          -- reaching a walker that is grey after all.
+          def.trueColor = swapped and true or nil
+          touched[def] = true
+        end
+        if swapped then greenArt[swapped] = true end
+      end
+    end
+    if not next(touched) then return end
+
+    -- Rebuild only the renderers holding a record we just moved.  A
+    -- SpriteRenderer reads the image once, in `new`, so the live player is
+    -- still drawing the sheet the old path resolved to until it is rebuilt --
+    -- and rebuilding by record rather than by name leaves a walker another
+    -- mod owns exactly where it was.
+    local player = Game.overworld and Game.overworld.player
+    if player then
+      local okSR, SpriteRenderer = pcall(require, "src.render.SpriteRenderer")
+      if okSR and type(SpriteRenderer) == "table" then
+        for _, key in ipairs({ "sprite", "surfSprite", "bikeSprite",
+                               "surfPikachuSprite" }) do
+          local renderer = player[key]
+          if type(renderer) == "table" and touched[renderer.def] then
+            local built, fresh = pcall(SpriteRenderer.new, renderer.def,
+                                       renderer.seed or "player")
+            if built then player[key] = fresh end
+          end
+        end
+      end
+    end
+
+    -- The hook reports one line per picture per session; a suit change is a
+    -- new set of pictures and should say so rather than stay quiet because it
+    -- has already spoken about that pic once.
+    for key in pairs(seen) do seen[key] = nil end
+    mod.log:info("player=%s -- repointed live (%s)", suit:upper(), why)
+  end
+
+  -- The three rows that decide which file a picture is read from.  The
+  -- others (the ribbon, the figure, the name list) are palettes and boot
+  -- data, and are either already live or deliberately not.
+  local LIVE_ROWS = { player = true, portrait_skin = true }
+
+  -- Guarded because `mod.events` is the one part of the mod table a harness
+  -- is likely not to stand up, and a mod that cannot listen should still
+  -- install everything else.
+  if mod.events and type(mod.events.on) == "function" then
+  mod.events:on("mod.options_changed", function(ev)
+    if type(ev) ~= "table" then return end
+    if ev.mod ~= mod and ev.mod ~= mod.id then return end
+    if not LIVE_ROWS[ev.key] then return end
+    wear(option("player", "green"))
+    -- The MEWMON and LOGO1 overrides are read by the zone hook out of the
+    -- upvalues `wear` just rewrote, so the title screen needs nothing here.
+    relive(tostring(ev.key))
+  end)
+  end
+
+  -- ------- what the bench drives
+  --
+  -- PLAYER is the one row in this mod worth turning repeatedly -- it is live
+  -- now, and "live" is a claim somebody has to be able to check -- so the
+  -- three things a bench needs to turn it are published rather than left to
+  -- be reached for.  Reading and writing the row itself, not the upvalue:
+  -- `setSuit` goes through mod.options:set so the mod manager, the save and
+  -- this mod all see the same value, and then does the same work the
+  -- options_changed listener does rather than duplicating it.
+  --
+  -- Nothing here is required for the mod to work.  A build with no bench
+  -- installed simply has three exports nobody asks for.
+  mod.exports.suits = function()
+    local out = {}
+    for _, name in ipairs({ "green", "red", "orange", "blue", "purple",
+                            "yellow", "pink", "black", "white", "grey" }) do
+      out[#out + 1] = name
+    end
+    return out
+  end
+
+  mod.exports.suit = function() return suit end
+
+  mod.exports.setSuit = function(name)
+    if type(name) ~= "string" then return false end
+    if name ~= "red" and not SUITS[name] then return false end
+    if mod.options and type(mod.options.set) == "function" then
+      pcall(function() mod.options:set("player", name) end)
+    end
+    wear(name)
+    relive("the bench")
+    return true
   end
 
   -- One line a player can quote back when a picture stays red.  The recipe

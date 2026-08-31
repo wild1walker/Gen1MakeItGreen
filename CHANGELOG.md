@@ -2,6 +2,40 @@
 
 All notable changes to this mod are recorded here, newest first.
 
+## [1.27.0] - 2026-08-31
+
+Everything the nightly channel built since 1.26.0, in one release.
+
+### Changed
+
+- **`PLAYER` takes effect where you are standing.** The walker, the bicycle
+  sheet and every picture change colour on the next frame rather than on the
+  next launch. The recipe already writes all nine suits at install, so
+  switching is a path change and not a rebuild — the overworld half was
+  waiting on a relaunch for no reason.
+- **The version ribbon follows the colour `PLAYER` is set to.** It was green
+  in every suit, and a purple character under a green title reads as a setting
+  that did not take.
+- **`MEWMON` — the palette across tile rows 10-17 — is the PORTRAIT four
+  rather than the overworld four.** That band is the mon, the figure, the
+  POKé BALL and the copyright line, and shade 2 is a light on all of them and
+  a face on none. Painting it skin put a skin-coloured half on the ball and
+  lettered GAME FREAK's line in skin.
+- **Both bands are coloured through the frame's zone list as well as through
+  the palette registry, so they reach `OG RED` and `ADVANCED`.** Under
+  `ADVANCED` the pack's own `LOGO1` lettered the ribbon yellow-green on pale
+  yellow and its `MEWMON` painted the ball and the bottom line a skin tone;
+  neither override was ever consulted there.
+- The mod publishes the player sheet it actually derived, so the suite's title
+  art keys the sprite on screen rather than the one on disk.
+
+### Known
+
+- The version ribbon's *artwork* is boot data, read once when the title screen
+  is built, so a change to it waits for a relaunch. Its *colour* does not —
+  that goes through the zone pass every frame.
+- The name list is boot data too, and a save that already has a name keeps it.
+
 ## [1.26.0] - 2026-08-29
 
 ### Added

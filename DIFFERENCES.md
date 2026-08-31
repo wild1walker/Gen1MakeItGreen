@@ -26,9 +26,23 @@ own ledger stays "None currently"; these are this mod's divergences.
 - **The title screen reads `WILD GREEN VERSION`.** One continuous ribbon in
   place of the imported pair of fragments. `TITLE RIBBON = OFF` gives back
   the imported art.
-- **`LOGO1` is overridden** to the Wild Green ramp. It is the SGB palette the
-  title's version-ribbon band wears, and the title screen is the only thing
-  that reads it.
+- **`LOGO1` is overridden** to the band ramp of whichever colour `PLAYER` is
+  set to. It is the SGB palette the title's version-ribbon band wears, and the
+  title screen is the only thing that reads it. It used to be green in every
+  suit, on the grounds that `WILD GREEN VERSION` is the game's name rather than
+  the character's jacket; the words still say `GREEN`, and only the ink moves.
+- **`MEWMON` is overridden** to the *portrait* four rather than the overworld
+  four. That palette covers tile rows 10-17, which is not only the standing
+  figure: the cycling mon, the POKE BALL beside him and the copyright line
+  along the bottom are all in the band, and shade 2 is a light on every one of
+  them and a face on none. Painting it the character's skin put a
+  skin-coloured half on the ball and lettered `GAME FREAK`'s line in skin.
+- **Both bands are coloured through the frame's zone list as well.** The
+  registry overrides above are named palettes, and two display modes do not
+  resolve names through the registry at all -- see the note below. The
+  `render.zones` hook is handed the finished zone list on the way to the blit,
+  after every name has been resolved, so the two bands wear the mod's colours
+  in every mode that colours at all.
 
 ## Known limits
 
@@ -83,12 +97,18 @@ own ledger stays "None currently"; these are this mod's divergences.
   picture, so he gets the same face, ear and hands; in every other mode his
   rectangle is painted by shade and `MEWMON` colours him flat.
 
-- **The green band is a registry record only under SGB.** `PaletteFX.pal`
-  (`src/render/PaletteFX.lua`) short-circuits every named palette to the
-  boot-ROM pair under `OG RED`, and reads `data/palettes_gbc` under
-  `ADVANCED`. In those two display modes the ribbon band keeps that mode's
-  own colour, so the lettering still says `WILD GREEN VERSION` but is drawn
-  in red. Nothing a mod can reach decides those two.
+- **The two title bands reach every colour mode now, and it took a second
+  seam to do it.** `PaletteFX.pal` (`src/render/PaletteFX.lua`)
+  short-circuits every named palette to the boot-ROM pair under `OG RED`, and
+  reads `data/palettes_gbc` under `ADVANCED` -- so in those two modes neither
+  registry override is consulted. Under `ADVANCED` the pack's own `LOGO1` is
+  white / `#f7f78c` / `#8cbd52` / `#ad0021`, which lettered the ribbon
+  yellow-green with a pale yellow shadow, and its `MEWMON` is white /
+  `#ef9c6b` / `#7321a5` / black, whose shade 1 is a skin tone -- the ball's
+  light half and the copyright line's highlight. Both bands are now recoloured
+  in the zone list instead, which every mode reads. The three deliberately
+  monochrome modes (`OG`, `OG INV`, `CLASSIC`) substitute the whole screen
+  downstream and are left to: a mono mode asked for one palette, not ours. Nothing a mod can reach decides those two.
 - **The recolored art is true-colour.** `trueColor` is what keeps the
   overworld's OBP bake from reading our green through the shade buckets it
   reads grey art through. The mono and inverted display modes do not honour
@@ -121,9 +141,20 @@ own ledger stays "None currently"; these are this mod's divergences.
   transform writes its pictures at install time and that screen is drawn very
   early.
 
-- **`PLAYER` takes effect on the next launch** for the overworld walker,
-  which is a `sprites` record and settled at load. The battle and card pics
-  ride the `player.sprite` hook and change as soon as the pic is re-resolved.
+- **`PLAYER` takes effect where you are standing.** It used to wait for the
+  next launch for the overworld walker, because that is a `sprites` record,
+  records are folded into `Game.data` once at load, and `SpriteRenderer` copies
+  the image out of the record when the `Player` is built. None of that had to
+  stay settled: the recipe writes all nine suits at install, always, so
+  switching colour was never a question of generating anything. Turning the row
+  repoints the folded record and rebuilds the renderers that had already copied
+  out of it, and the walker changes colour under your feet. `PORTRAIT SKIN`
+  moves the same moment.
+
+  Two things still wait for a relaunch, and both are boot data rather than art:
+  the version ribbon's *artwork* (`field.boot.title`, read once when the title
+  screen is built -- its *colour* is live, since that goes through the zone
+  pass every frame) and the name list.
 - **The default name only reaches a new game.** A save that already has a
   name keeps it, which is the point.
 - **A cache without one of the pictures leaves that picture alone.**
